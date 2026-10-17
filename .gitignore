@@ -1,0 +1,11 @@
+# Compilación
+.build/
+build/
+dist/
+*.app
+
+# Clon de REA (proyecto aparte)
+rea/
+
+# macOS
+.DS_Store
