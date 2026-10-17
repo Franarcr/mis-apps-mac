@@ -6,7 +6,7 @@ Hay tres apps. Instala las que quieras:
 | --- | --- | --- |
 | **Captura** | Capturas de pantalla, texto (OCR), vídeo con sonido y capturas largas con desplazamiento | macOS 15 o posterior |
 | **Portapapeles** | Guarda las últimas 100 cosas que copias | macOS 14 o posterior |
-| **Monitor** | Widget en el escritorio con CPU, memoria, red, disco y batería | macOS 14 o posterior |
+| **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
 
 Funcionan en cualquier Mac con chip Apple (M1, M2, M3, M4, M5…).
 
