@@ -8,7 +8,9 @@ Widget flotante para macOS (14+) que muestra en tiempo real (cada segundo) los r
 - **Batería**: porcentaje y estado de carga
 - Los **3 procesos que más CPU usan**
 
-El widget se mueve arrastrándolo y recuerda su posición. Por defecto queda en el escritorio, debajo de las ventanas, como un widget normal. Desde el icono de la barra de menú puedes:
+Un segundo widget, **Baterías**, muestra la carga del Mac (con el tiempo restante) y la de los accesorios Bluetooth conectados: teclado, ratón, trackpad, auriculares y AirPods (izquierdo, derecho y estuche por separado). Se actualiza cada 30 segundos. La barra cambia de color según la carga: **verde** a partir del 50 %, **amarillo** entre 25 y 49 %, **naranja** entre 10 y 24 % y **rojo** por debajo del 10 %. macOS no permite leer la batería del iPhone, el iPad ni el Apple Watch.
+
+Los widgets se mueven arrastrándolos y recuerda su posición. Por defecto queda en el escritorio, debajo de las ventanas, como un widget normal. Desde el icono de la barra de menú puedes:
 
 - mantenerlo encima de las ventanas
 - mostrar el % de CPU en la barra de menú

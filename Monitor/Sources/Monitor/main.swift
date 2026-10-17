@@ -10,6 +10,15 @@ if args.count == 3, args[1] == "--snapshot" {
     exit(0)
 }
 
+// Imagen del widget de baterías: con los dispositivos reales o con datos de ejemplo.
+//   Monitor --snapshot-baterias /ruta/baterias.png [--demo]
+if args.count >= 3, args[1] == "--snapshot-baterias" {
+    MainActor.assumeIsolated {
+        BatterySnapshot.render(to: URL(fileURLWithPath: args[2]), demo: args.contains("--demo"))
+    }
+    exit(0)
+}
+
 let app = NSApplication.shared
 let delegate = MainActor.assumeIsolated { AppDelegate() }
 app.delegate = delegate

@@ -42,6 +42,11 @@ enum Preferences {
         set { UserDefaults.standard.set(newValue, forKey: "cpuInMenuBar") }
     }
 
+    static var batteryWidgetVisible: Bool {
+        get { UserDefaults.standard.object(forKey: "batteryWidgetVisible") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "batteryWidgetVisible") }
+    }
+
     static var widgetVisible: Bool {
         get { UserDefaults.standard.object(forKey: "widgetVisible") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "widgetVisible") }
@@ -53,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let monitor = SystemMonitor()
     private var statusItem: NSStatusItem!
     private var panel: WidgetPanel!
+    private let batteries = BatteryMonitor()
+    private var batteryPanel: WidgetPanel!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let host = DraggableHostingView(rootView: WidgetView(monitor: monitor))
@@ -66,6 +73,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.setFrameAutosaveName("MonitorWidget")
         if Preferences.widgetVisible { panel.orderFrontRegardless() }
 
+        // Segundo widget: baterías. La primera vez se coloca a la izquierda del de recursos.
+        batteryPanel = WidgetPanel(content: DraggableHostingView(rootView: BatteryWidgetView(batteries: batteries)))
+        if !batteryPanel.setFrameUsingName("BatteryWidget") {
+            batteryPanel.setFrameTopLeftPoint(NSPoint(x: panel.frame.minX - batteryPanel.frame.width - 16,
+                                                      y: panel.frame.maxY))
+        }
+        batteryPanel.setFrameAutosaveName("BatteryWidget")
+        applyLevel()
+        if Preferences.batteryWidgetVisible { batteryPanel.orderFrontRegardless() }
+        batteries.start()
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
@@ -78,9 +96,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// En el escritorio (debajo de las ventanas, como un widget) o siempre encima.
     private func applyLevel() {
-        panel.level = Preferences.alwaysOnTop
+        let level: NSWindow.Level = Preferences.alwaysOnTop
             ? .floating
             : NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
+        panel.level = level
+        batteryPanel?.level = level
     }
 
     private func updateStatusItem() {
@@ -102,7 +122,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(item(panel.isVisible ? "Ocultar widget" : "Mostrar widget", #selector(toggleWidget)))
+        menu.addItem(item(panel.isVisible ? "Ocultar widget de recursos" : "Mostrar widget de recursos", #selector(toggleWidget)))
+        menu.addItem(item(batteryPanel.isVisible ? "Ocultar widget de baterías" : "Mostrar widget de baterías",
+                          #selector(toggleBatteryWidget)))
         menu.addItem(.separator())
         menu.addItem(item("Mantener encima de las ventanas", #selector(toggleOnTop), on: Preferences.alwaysOnTop))
         menu.addItem(item("Mostrar CPU en la barra de menú", #selector(toggleCPU), on: Preferences.cpuInMenuBar))
@@ -123,6 +145,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleWidget() {
         if panel.isVisible { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
         Preferences.widgetVisible = panel.isVisible
+    }
+
+    @objc private func toggleBatteryWidget() {
+        if batteryPanel.isVisible {
+            batteryPanel.orderOut(nil)
+        } else {
+            batteries.refresh()
+            batteryPanel.orderFrontRegardless()
+        }
+        Preferences.batteryWidgetVisible = batteryPanel.isVisible
     }
 
     @objc private func toggleOnTop() {
