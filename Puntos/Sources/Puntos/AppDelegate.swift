@@ -8,7 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var notes = NoteWindowController(store: store)
     private let hotKeys = HotKeyManager()
     private var statusItem: NSStatusItem!
+    private let statusMenu = NSMenu()
 
+    /// Ventana fija: no se oculta al cambiar de app y queda encima de las demás.
     var alwaysOnTop: Bool {
         get { UserDefaults.standard.bool(forKey: "alwaysOnTop") }
         set { UserDefaults.standard.set(newValue, forKey: "alwaysOnTop") }
@@ -23,29 +25,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let icon = NSImage(systemSymbolName: "circle.grid.3x3.fill", accessibilityDescription: "Puntos")
         icon?.isTemplate = true
         statusItem.button?.image = icon
-        let menu = NSMenu()
-        menu.delegate = self
-        statusItem.menu = menu
+        // Clic: muestra u oculta la ventana. Clic derecho (o ⌃clic): menú de opciones.
+        statusMenu.delegate = self
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(statusItemClicked)
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         if !hotKeys.register(keyCode: kVK_ANSI_N, modifiers: UInt32(optionKey | shiftKey), handler: { [weak self] in
             self?.toggleWindow()
         }) {
             NSLog("Puntos: el atajo ⌥⇧N ya está en uso")
         }
-        notes.show()
+        showWindow()
     }
 
     func applicationWillTerminate(_ notification: Notification) { store.saveAll() }
 
+    /// Como Tot: al pasar a otra app, la ventana desaparece (salvo que esté fija).
+    func applicationDidResignActive(_ notification: Notification) {
+        guard !alwaysOnTop, notes.window.isVisible, notes.window.attachedSheet == nil else { return }
+        store.saveAll()
+        notes.window.orderOut(nil)
+    }
+
     /// Al abrir la app otra vez (desde Aplicaciones o Spotlight) se muestra la ventana.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        notes.show()
+        showWindow()
         return false
     }
 
     @objc func toggleWindow() {
-        if notes.isFrontmost { notes.window.orderOut(nil) } else { notes.show() }
+        if notes.isFrontmost { notes.window.orderOut(nil) } else { showWindow() }
     }
+
+    @objc private func statusItemClicked() {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            // El menú se asigna solo mientras se muestra; si no, el clic normal también lo abriría.
+            statusItem.menu = statusMenu
+            statusItem.button?.performClick(nil)
+            statusItem.menu = nil
+        } else {
+            toggleWindow()
+        }
+    }
+
+    /// Posición del icono de la barra de menú en pantalla.
+    private var statusAnchor: NSRect? { statusItem.button?.window?.frame }
 
     // MARK: Menú de la barra
 
@@ -66,7 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        let onTop = NSMenuItem(title: "Mantener ventana encima", action: #selector(toggleOnTop), keyEquivalent: "")
+        let onTop = NSMenuItem(title: "Mantener ventana visible", action: #selector(toggleOnTop), keyEquivalent: "")
+        onTop.toolTip = "No se oculta al cambiar de app y queda encima de las demás ventanas"
         onTop.target = self
         onTop.state = alwaysOnTop ? .on : .off
         menu.addItem(onTop)
@@ -96,11 +123,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc private func showWindow() { notes.show() }
+    @objc private func showWindow() { notes.show(below: statusAnchor) }
 
     @objc private func openNote(_ sender: NSMenuItem) {
         notes.select(sender.tag)
-        notes.show()
+        showWindow()
     }
 
     @objc private func toggleOnTop() {

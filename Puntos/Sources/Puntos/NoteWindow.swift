@@ -88,7 +88,7 @@ final class NoteWindowController: NSObject, NSWindowDelegate, NSTextViewDelegate
     init(store: NotesStore) {
         self.store = store
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 540),
-                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                          styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         let scroll = NSTextView.scrollableTextView()
         textView = scroll.documentView as! NSTextView
@@ -100,7 +100,10 @@ final class NoteWindowController: NSObject, NSWindowDelegate, NSTextViewDelegate
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 320, height: 280)
         window.delegate = self
-        window.collectionBehavior = [.fullScreenAuxiliary]
+        // Como Tot: solo el botón de cerrar (no se minimiza ni se pone a pantalla completa).
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.collectionBehavior = [.fullScreenNone, .moveToActiveSpace]
         window.setFrameAutosaveName("PuntosWindow")
         if !window.setFrameUsingName("PuntosWindow") { window.center() }
 
@@ -269,7 +272,14 @@ final class NoteWindowController: NSObject, NSWindowDelegate, NSTextViewDelegate
         restyle()
     }
 
-    func show() {
+    /// Muestra la ventana. Con `anchor` (el icono de la barra de menú), la coloca centrada justo debajo, como Tot.
+    func show(below anchor: NSRect? = nil) {
+        if let anchor, let screen = NSScreen.screens.first(where: { $0.frame.intersects(anchor) }) ?? NSScreen.main {
+            let size = window.frame.size
+            let vf = screen.visibleFrame
+            let x = min(max(anchor.midX - size.width / 2, vf.minX + 8), vf.maxX - size.width - 8)
+            window.setFrameTopLeftPoint(NSPoint(x: x, y: min(anchor.minY - 6, vf.maxY)))
+        }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(textView)
