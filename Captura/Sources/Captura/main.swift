@@ -31,6 +31,27 @@ if args.count >= 3, args[1] == "--stitch-test" {
     exit(results.allSatisfy { $0 } ? 0 : 1)
 }
 
+// Pruebas sin pantalla del editor de anotaciones y del GIF:
+//   Captura --annotate-test imagen.png salida.png
+//   Captura --gif-test video.mp4 salida.gif
+if args.count == 4, args[1] == "--annotate-test" {
+    MainActor.assumeIsolated { AnnotationTest.run(source: URL(fileURLWithPath: args[2]), output: URL(fileURLWithPath: args[3])) }
+    exit(0)
+}
+if args.count == 4, args[1] == "--gif-test" {
+    let semaphore = DispatchSemaphore(value: 0)
+    Task.detached {
+        do {
+            let start = Date()
+            try await GifMaker.make(from: URL(fileURLWithPath: args[2]), to: URL(fileURLWithPath: args[3]))
+            print(String(format: "GIF creado en %.1f s", Date().timeIntervalSince(start)))
+        } catch { print("Error: \(error.localizedDescription)") }
+        semaphore.signal()
+    }
+    semaphore.wait()
+    exit(0)
+}
+
 let app = NSApplication.shared
 let delegate = MainActor.assumeIsolated { AppDelegate() }
 app.delegate = delegate

@@ -4,7 +4,7 @@ Cuatro apps de barra de menú para macOS con chip Apple, escritas en Swift sin X
 
 | App | Qué hace | macOS |
 | --- | --- | --- |
-| [Captura](Captura/) | Capturas de pantalla completa o de área, OCR, vídeo con audio y capturas largas con desplazamiento (al estilo de CleanShot) | 15+ |
+| [Captura](Captura/) | Capturas de pantalla completa o de área con anotaciones (flechas, cuadros, texto), OCR, vídeo con audio, GIF y capturas largas con desplazamiento (al estilo de CleanShot) | 15+ |
 | [Portapapeles](Portapapeles/) | Historial de las últimas 100 copias, con buscador (⌥⇧V) | 14+ |
 | [Puntos](Puntos/) | Bloc de 7 notas con Markdown en vivo, al estilo de Tot (⌥⇧N) | 14+ |
 | [Monitor](Monitor/) | Widget de escritorio con CPU, memoria, GPU, red, disco, batería y procesos en tiempo real | 14+ |

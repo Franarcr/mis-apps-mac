@@ -4,7 +4,7 @@ Hay cuatro apps. Instala las que quieras:
 
 | App | Para qué sirve | Necesita |
 | --- | --- | --- |
-| **Captura** | Capturas de pantalla, texto (OCR), vídeo con sonido y capturas largas con desplazamiento | macOS 15 o posterior |
+| **Captura** | Capturas de pantalla con flechas, cuadros y texto, OCR, vídeo con sonido, GIF y capturas largas con desplazamiento | macOS 15 o posterior |
 | **Portapapeles** | Guarda las últimas 100 cosas que copias | macOS 14 o posterior |
 | **Puntos** | Bloc de 7 notas de colores para apuntar cosas rápido (⌥⇧N) | macOS 14 o posterior |
 | **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
@@ -48,6 +48,9 @@ En el menú de cada app puedes activar **Abrir al iniciar sesión** para que arr
 | ⌥⇧3 | Copiar texto de la pantalla (OCR) |
 | ⌥⇧4 | Grabar vídeo (pulsa otra vez para detener) |
 | ⌥⇧5 | Captura larga con desplazamiento (pulsa otra vez para terminar) |
+| ⌥⇧6 | Grabar GIF (pulsa otra vez para detener) |
+
+Para poner flechas, cuadros o texto en una captura, pulsa ✏️ en la miniatura que aparece abajo a la izquierda (o haz doble clic en ella).
 
 **Portapapeles**
 

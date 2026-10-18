@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenu()
+        NSApp.mainMenu = buildMainMenu()
         // Borra las capturas temporales de sesiones anteriores.
         try? FileManager.default.removeItem(at: CaptureController.tempFolder)
 
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotKeys.register(keyCode: kVK_ANSI_3, modifiers: mods) { [weak self] in self?.capture.captureText() },
             hotKeys.register(keyCode: kVK_ANSI_4, modifiers: mods) { [weak self] in self?.capture.toggleVideo() },
             hotKeys.register(keyCode: kVK_ANSI_5, modifiers: mods) { [weak self] in self?.capture.toggleScrolling() },
+            hotKeys.register(keyCode: kVK_ANSI_6, modifiers: mods) { [weak self] in self?.capture.toggleGIF() },
         ]
         if ok.contains(false) {
             Toast.show("Algún atajo ya está en uso", symbol: "exclamationmark.triangle.fill",
@@ -45,7 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Capturar texto (OCR)", "3", #selector(ocr)))
         menu.addItem(item("Grabar vídeo", "4", #selector(video)))
         menu.addItem(item("Captura con desplazamiento", "5", #selector(scrolling)))
+        menu.addItem(item("Grabar GIF", "6", #selector(gif)))
         menu.addItem(.separator())
+        let annotate = item("Anotar tras capturar", "", #selector(toggleAnnotate(_:)))
+        annotate.state = Settings.annotateAfterCapture ? .on : .off
+        menu.addItem(annotate)
         saveItem = item("Guardar también en archivo", "", #selector(toggleSave))
         saveItem.state = Settings.saveToFile ? .on : .off
         menu.addItem(saveItem)
@@ -164,6 +170,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func ocr() { afterMenuCloses { self.capture.captureText() } }
     @objc private func video() { afterMenuCloses { self.capture.toggleVideo() } }
     @objc private func scrolling() { afterMenuCloses { self.capture.toggleScrolling() } }
+    @objc private func gif() { afterMenuCloses { self.capture.toggleGIF() } }
+
+    @objc private func toggleAnnotate(_ sender: NSMenuItem) {
+        Settings.annotateAfterCapture.toggle()
+        sender.state = Settings.annotateAfterCapture ? .on : .off
+    }
+
+    /// Menú principal (no se ve porque la app vive en la barra de menú), necesario para que
+    /// funcionen ⌘Z, ⌘C, ⌘V, ⌘S… en el editor de anotaciones.
+    private func buildMainMenu() -> NSMenu {
+        let main = NSMenu()
+        func submenu(_ title: String, _ items: [NSMenuItem]) {
+            let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let menu = NSMenu(title: title)
+            items.forEach(menu.addItem)
+            parent.submenu = menu
+            main.addItem(parent)
+        }
+        func entry(_ title: String, _ action: Selector, _ key: String, _ mods: NSEvent.ModifierFlags = .command) -> NSMenuItem {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+            item.keyEquivalentModifierMask = mods
+            return item
+        }
+        submenu("Captura", [
+            entry("Guardar", Selector(("saveImage:")), "s"),
+            entry("Cerrar ventana", #selector(NSWindow.performClose(_:)), "w"),
+        ])
+        submenu("Edición", [
+            entry("Deshacer", Selector(("undo:")), "z"),
+            entry("Rehacer", Selector(("redo:")), "z", [.command, .shift]),
+            .separator(),
+            entry("Cortar", #selector(NSText.cut(_:)), "x"),
+            entry("Copiar", #selector(NSText.copy(_:)), "c"),
+            entry("Pegar", #selector(NSText.paste(_:)), "v"),
+            entry("Seleccionar todo", #selector(NSText.selectAll(_:)), "a"),
+        ])
+        return main
+    }
 
     @objc private func openFolder() {
         try? FileManager.default.createDirectory(at: Settings.saveFolder, withIntermediateDirectories: true)

@@ -47,8 +47,10 @@ enum QuickAccess {
     private static var seconds = 3
 
     /// Muestra la miniatura y la oculta tras `seconds` segundos (la cuenta se pausa con el ratón encima).
+    /// Con `onAnnotate`, la miniatura muestra el botón de anotar y el doble clic abre el editor.
     static func show(image: CGImage, fileURL: URL, saved: Bool, seconds: Int,
-                     onCopy: @escaping () -> Void, onSave: @escaping () -> URL?) {
+                     onCopy: @escaping () -> Void, onSave: @escaping () -> URL?,
+                     onAnnotate: (() -> Void)? = nil) {
         dismiss()
         self.seconds = seconds
         let view = QuickAccessView(
@@ -61,7 +63,8 @@ enum QuickAccess {
                 dismiss()
                 Toast.show("Captura guardada", detail: url.deletingLastPathComponent().path)
             },
-            onClose: { dismiss() }
+            onClose: { dismiss() },
+            onAnnotate: onAnnotate.map { annotate in { dismiss(); annotate() } }
         )
         let host = HoverHostingView(rootView: view)
         host.frame.size = host.fittingSize
@@ -98,6 +101,7 @@ private struct QuickAccessView: View {
     let onCopy: () -> Void
     let onSave: () -> Void
     let onClose: () -> Void
+    let onAnnotate: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 8) {
@@ -108,9 +112,11 @@ private struct QuickAccessView: View {
                 .frame(width: 240, height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
-                .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
-                .help("Arrástrala a otra app o haz doble clic para abrirla")
+                .onTapGesture(count: 2) { if let onAnnotate { onAnnotate() } else { NSWorkspace.shared.open(url) } }
+                .help(onAnnotate == nil ? "Arrástrala a otra app o haz doble clic para abrirla"
+                                        : "Arrástrala a otra app o haz doble clic para anotarla")
             HStack(spacing: 6) {
+                if let onAnnotate { action("pencil.tip.crop.circle", "Anotar (flechas, cuadros y texto)", onAnnotate) }
                 action("doc.on.doc", "Copiar", onCopy)
                 if saved {
                     action("folder", "Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
