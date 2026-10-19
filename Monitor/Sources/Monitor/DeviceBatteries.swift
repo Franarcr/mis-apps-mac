@@ -1,4 +1,5 @@
 import Foundation
+import IOKit
 import IOKit.ps
 
 /// Un dispositivo con batería: el Mac o un accesorio Bluetooth conectado.
@@ -71,6 +72,9 @@ enum DeviceBatteryReader {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let controllers = json["SPBluetoothDataType"] as? [[String: Any]] else { return [] }
 
+        // El informe de Bluetooth a veces omite la batería de un accesorio conectado (p. ej. el
+        // Magic Keyboard); el registro de IOKit la sigue teniendo, indexada por dirección.
+        let fallback = accessoryBatteriesFromIOKit()
         var devices: [DeviceBattery] = []
         for controller in controllers {
             for entry in controller["device_connected"] as? [[String: Any]] ?? [] {
@@ -82,13 +86,16 @@ enum DeviceBatteryReader {
                         ("device_batteryLevelRight", "Der."),
                         ("device_batteryLevelCase", "Estuche"),
                     ]
-                    let levels = parts.compactMap { part -> DeviceBattery.Level? in
+                    var levels = parts.compactMap { part -> DeviceBattery.Level? in
                         guard let text = info[part.key] as? String,
                               let percent = Int(text.trimmingCharacters(in: CharacterSet(charactersIn: "% "))) else { return nil }
                         return .init(label: part.label, percent: percent)
                     }
-                    guard !levels.isEmpty else { continue }
                     let address = info["device_address"] as? String ?? name
+                    if levels.isEmpty, let percent = fallback[normalized(address)] {
+                        levels = [.init(label: nil, percent: percent)]
+                    }
+                    guard !levels.isEmpty else { continue }
                     devices.append(DeviceBattery(id: address, name: name,
                                                  symbol: symbol(for: name, type: info["device_minorType"] as? String),
                                                  levels: levels))
@@ -96,6 +103,33 @@ enum DeviceBatteryReader {
             }
         }
         return devices
+    }
+
+    /// Batería de los accesorios de Apple según IOKit: dirección normalizada → porcentaje.
+    private static func accessoryBatteriesFromIOKit() -> [String: Int] {
+        var result: [String: Int] = [:]
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("AppleDeviceManagementHIDEventService"),
+                                           &iterator) == KERN_SUCCESS else { return result }
+        defer { IOObjectRelease(iterator) }
+        var service = IOIteratorNext(iterator)
+        while service != 0 {
+            func property(_ key: String) -> Any? {
+                IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
+            }
+            if let percent = (property("BatteryPercent") as? NSNumber)?.intValue,
+               let address = property("DeviceAddress") as? String {
+                result[normalized(address)] = percent
+            }
+            IOObjectRelease(service)
+            service = IOIteratorNext(iterator)
+        }
+        return result
+    }
+
+    /// "1C:1D:D3:87:95:8E" y "1c-1d-d3-87-95-8e" son la misma dirección.
+    private static func normalized(_ address: String) -> String {
+        address.lowercased().filter { $0.isHexDigit }
     }
 
     private static func symbol(for name: String, type: String?) -> String {
