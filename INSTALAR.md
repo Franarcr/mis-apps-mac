@@ -1,6 +1,6 @@
 # Cómo instalar las apps
 
-Hay cuatro apps. Instala las que quieras:
+Hay cinco apps. Instala las que quieras:
 
 | App | Para qué sirve | Necesita |
 | --- | --- | --- |
@@ -8,6 +8,7 @@ Hay cuatro apps. Instala las que quieras:
 | **Portapapeles** | Guarda las últimas 100 cosas que copias | macOS 14 o posterior |
 | **Puntos** | Bloc de 7 notas de colores para apuntar cosas rápido (⌥⇧N) | macOS 14 o posterior |
 | **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
+| **Historietas** | Leer cómics y manga en formato CBZ, CBR, CB7 y CBT | macOS 14 o posterior |
 
 Funcionan en cualquier Mac con chip Apple (M1, M2, M3, M4, M5…).
 
@@ -29,13 +30,13 @@ Solo hay que hacerlo una vez por app.
 
 ## 3. Dar los permisos
 
-Las tres apps viven en la **barra de menú** (arriba a la derecha) y no en el Dock.
+Captura, Portapapeles, Puntos y Monitor viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas sí aparece en el Dock, como cualquier app con ventanas.
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
-- **Puntos** y **Monitor:** no necesitan permisos.
+- **Puntos**, **Monitor** e **Historietas:** no necesitan permisos.
 
-En el menú de cada app puedes activar **Abrir al iniciar sesión** para que arranque sola.
+En el menú de las apps de la barra de menú puedes activar **Abrir al iniciar sesión** para que arranque sola.
 
 ## Atajos
 
@@ -68,5 +69,17 @@ Para poner flechas, cuadros o texto en una captura, pulsa ✏️ en la miniatura
 | ⌥⇧N | Mostrar u ocultar las notas |
 | ⌘1 – ⌘7 | Cambiar de nota |
 | ⌘B / ⌘I | Negrita / cursiva |
+
+**Historietas**
+
+Abre un cómic con doble clic en el Finder o arrastrándolo al icono de la app.
+
+| Atajo | Acción |
+| --- | --- |
+| → / ← | Página siguiente / anterior |
+| Espacio | Bajar por la página o pasar a la siguiente |
+| ⌘D | Doble página |
+| ⇧⌘M | Lectura de derecha a izquierda (manga) |
+| ⌃⌘F | Pantalla completa |
 
 ⌥ es la tecla *Opción* y ⇧ es *Mayúsculas*.

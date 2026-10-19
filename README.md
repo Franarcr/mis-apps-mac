@@ -1,6 +1,6 @@
 # Mis apps para Mac
 
-Cuatro apps de barra de menú para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Command Line Tools).
+Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Command Line Tools). Cuatro viven en la barra de menú; Historietas es un lector con ventanas normales y vive en el Dock.
 
 | App | Qué hace | macOS |
 | --- | --- | --- |
@@ -8,6 +8,7 @@ Cuatro apps de barra de menú para macOS con chip Apple, escritas en Swift sin X
 | [Portapapeles](Portapapeles/) | Historial de las últimas 100 copias, con buscador (⌥⇧V) | 14+ |
 | [Puntos](Puntos/) | Bloc de 7 notas con Markdown en vivo, al estilo de Tot (⌥⇧N) | 14+ |
 | [Monitor](Monitor/) | Widget de escritorio con CPU, memoria, GPU, red, disco, batería y procesos en tiempo real | 14+ |
+| [Historietas](Historietas/) | Lector de cómics CBZ, CBR, CB7 y CBT, con doble página, lectura de manga y la página por la que ibas | 14+ |
 
 Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md).
 
@@ -25,7 +26,7 @@ Después, cada app se compila e instala en `/Applications` con su script:
 cd Captura && ./build.sh
 ```
 
-Para generar los tres `.zip` y las instrucciones en `dist/`:
+Para generar los `.zip` y las instrucciones en `dist/`:
 
 ```bash
 ./empaquetar.sh
