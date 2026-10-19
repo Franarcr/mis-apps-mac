@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Historietas</string>
+    <key>CFBundleDisplayName</key>
+    <string>Historietas</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.fran.historietas</string>
+    <key>CFBundleExecutable</key>
+    <string>Historietas</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.entertainment</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Cómic</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.fran.historietas.cbz</string>
+                <string>com.fran.historietas.cbr</string>
+                <string>com.fran.historietas.cb7</string>
+                <string>com.fran.historietas.cbt</string>
+            </array>
+        </dict>
+    </array>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.fran.historietas.cbz</string>
+            <key>UTTypeDescription</key>
+            <string>Cómic (CBZ)</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.data</string><string>public.archive</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>cbz</string></array></dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.fran.historietas.cbr</string>
+            <key>UTTypeDescription</key>
+            <string>Cómic (CBR)</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.data</string><string>public.archive</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>cbr</string></array></dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.fran.historietas.cb7</string>
+            <key>UTTypeDescription</key>
+            <string>Cómic (CB7)</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.data</string><string>public.archive</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>cb7</string></array></dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.fran.historietas.cbt</string>
+            <key>UTTypeDescription</key>
+            <string>Cómic (CBT)</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.data</string><string>public.archive</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>cbt</string></array></dict>
+        </dict>
+    </array>
+</dict>
+</plist>
