@@ -4,8 +4,8 @@ import ServiceManagement
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
-    private let quitOnClose = QuitOnClose()
-    private let greenButton = GreenButton()
+    private let buttons = WindowButtons()
+    private var quitOnClose: QuitOnClose { buttons.quitOnClose }
     private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -17,9 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
 
-        quitOnClose.start()
         if Accessibility.isTrusted {
-            greenButton.start()
+            buttons.start()
         } else {
             Accessibility.requestAccess()
             waitForPermission()
@@ -32,8 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             MainActor.assumeIsolated {
                 guard Accessibility.isTrusted, let self else { return }
                 timer.invalidate()
-                self.greenButton.start()
-                self.quitOnClose.refresh()
+                self.buttons.start()
             }
         }
     }
@@ -52,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let green = item("Botón verde agranda la ventana", #selector(toggleGreenButton))
         green.toolTip = "En lugar de pantalla completa. Con ⌥ pulsada, el botón hace lo de siempre."
-        green.state = greenButton.isEnabled ? .on : .off
+        green.state = buttons.isGreenEnabled ? .on : .off
         menu.addItem(green)
 
         let quit = item("Cerrar la app con el botón rojo", nil)
@@ -70,7 +68,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Las apps abiertas y las ya elegidas, cada una con su marca.
     private func quitOnCloseMenu() -> NSMenu {
         let menu = NSMenu()
-        let header = NSMenuItem(title: "Al cerrar su última ventana, se cierran:", action: nil, keyEquivalent: "")
+        let all = item("En todas las apps", #selector(toggleAllApps))
+        all.toolTip = "Menos el Finder"
+        all.state = quitOnClose.allApps ? .on : .off
+        menu.addItem(all)
+        menu.addItem(.separator())
+        let header = NSMenuItem(title: "Solo en estas apps:", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
 
@@ -88,7 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for (id, app) in apps.sorted(by: { $0.value.name.localizedStandardCompare($1.value.name) == .orderedAscending }) {
             let entry = item(app.name.replacingOccurrences(of: ".app", with: ""), #selector(toggleQuitOnClose(_:)))
             entry.representedObject = id
-            entry.state = quitOnClose.contains(id) ? .on : .off
+            entry.state = quitOnClose.applies(to: id) ? .on : .off
+            // Con «En todas las apps» marcado, la lista solo muestra el estado.
+            if quitOnClose.allApps { entry.action = nil }
             entry.image = app.icon.map { icon in
                 let small = icon.copy() as! NSImage
                 small.size = NSSize(width: 16, height: 16)
@@ -107,10 +112,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func requestAccess() { Accessibility.requestAccess() }
 
-    @objc private func toggleGreenButton() {
-        greenButton.isEnabled.toggle()
-        greenButton.start()
-    }
+    @objc private func toggleGreenButton() { buttons.isGreenEnabled.toggle() }
+
+    @objc private func toggleAllApps() { quitOnClose.allApps.toggle() }
 
     @objc private func toggleQuitOnClose(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }

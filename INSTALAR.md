@@ -35,7 +35,7 @@ Captura, Portapapeles, Puntos, Monitor y Ventanas viven en la **barra de menú**
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
-- **Ventanas:** pide permiso de **Accesibilidad** para mover y cerrar las ventanas de otras apps. Actívalo en Ajustes; no hace falta reiniciarla. Las apps que se cierran con el botón rojo se eligen en su menú.
+- **Ventanas:** pide permiso de **Accesibilidad** para mover y cerrar las ventanas de otras apps. Actívalo en Ajustes; no hace falta reiniciarla. El botón rojo cierra la app en todas las apps; desde su menú puedes elegir solo algunas.
 - **Puntos**, **Monitor** e **Historietas:** no necesitan permisos.
 
 En el menú de las apps de la barra de menú puedes activar **Abrir al iniciar sesión** para que arranque sola.

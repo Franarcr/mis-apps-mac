@@ -3,7 +3,7 @@
 App de barra de menú para macOS (14+) que cambia el comportamiento de los botones de las ventanas.
 
 - **Botón verde agranda la ventana**: la ventana ocupa toda la pantalla (sin tapar la barra de menús ni el Dock) en lugar de pasar a pantalla completa en otro escritorio. Otro clic la devuelve a su tamaño anterior. Si mantienes **⌥** pulsada, el botón hace lo de siempre. Viene activado.
-- **Cerrar la app con el botón rojo**: en las apps que elijas, al cerrar su última ventana (con el botón rojo o ⌘W) la app se cierra del todo, en lugar de quedarse abierta en el Dock sin ventanas. Se eligen desde el icono de la barra de menú › *Cerrar la app con el botón rojo*, donde aparecen las apps abiertas. El Finder no se puede elegir.
+- **Cerrar la app con el botón rojo**: si cierras con el botón rojo la última ventana de una app, la app se cierra del todo, en lugar de quedarse abierta en el Dock sin ventanas. Si la app pregunta antes si quieres guardar, se cierra después de que respondas. Viene activado en todas las apps menos el Finder. Desde el icono de la barra de menú › *Cerrar la app con el botón rojo* puedes desmarcar *En todas las apps* y elegir solo algunas. Cerrar la ventana con ⌘W no cierra la app.
 
 ## Permisos
 
@@ -11,8 +11,7 @@ Necesita el permiso de **Accesibilidad** para ver y mover las ventanas de otras 
 
 ## Limitaciones
 
-- macOS solo informa de las ventanas del escritorio (Space) actual. Si una app elegida tiene ventanas en otro escritorio y cierras la última del escritorio actual, la app se cierra igual.
-- Las apps que piden guardar los cambios lo siguen haciendo al cerrar la ventana, antes de que la app se cierre.
+- macOS solo informa de las ventanas del escritorio (Space) actual. Si una app elegida tiene ventanas en otro escritorio y cierras con el botón rojo la última del escritorio actual, la app se cierra igual.
 
 ## Compilar
 

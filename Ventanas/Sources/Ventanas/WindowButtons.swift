@@ -1,12 +1,17 @@
 import AppKit
 import ApplicationServices
 
-/// El botón verde agranda la ventana hasta ocupar la pantalla (sin la barra de menús ni el Dock)
-/// en lugar de pasarla a pantalla completa en otro escritorio. Otro clic la devuelve a su tamaño.
-/// Con ⌥ pulsada, el botón hace lo de siempre.
+/// Vigila los clics en los botones de las ventanas de todas las apps:
+/// - El verde agranda la ventana hasta ocupar la pantalla (sin la barra de menús ni el Dock)
+///   en lugar de pasarla a pantalla completa en otro escritorio. Otro clic la devuelve a su tamaño.
+///   Con ⌥ pulsada, el botón hace lo de siempre.
+/// - El rojo, si era la última ventana de la app, cierra también la app (ver QuitOnClose).
 @MainActor
-final class GreenButton {
-    var isEnabled: Bool {
+final class WindowButtons {
+    let quitOnClose = QuitOnClose()
+
+    /// El botón verde agranda la ventana.
+    var isGreenEnabled: Bool {
         get { UserDefaults.standard.object(forKey: "greenButton") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "greenButton") }
     }
@@ -27,7 +32,7 @@ final class GreenButton {
         guard tap == nil, Accessibility.isTrusted else { return }
         let mask = CGEventMask(1 << CGEventType.leftMouseDown.rawValue) | CGEventMask(1 << CGEventType.leftMouseUp.rawValue)
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                          eventsOfInterest: mask, callback: greenButtonCallback,
+                                          eventsOfInterest: mask, callback: windowButtonsCallback,
                                           userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return }
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
@@ -45,28 +50,39 @@ final class GreenButton {
             swallowMouseUp = false
             return false
         case .leftMouseDown:
-            guard isEnabled, !event.flags.contains(.maskAlternate),
-                  let window = windowOfGreenButton(at: event.location) else { return true }
-            swallowMouseUp = true
-            DispatchQueue.main.async { [weak self] in self?.toggleFill(window) }
-            return false
+            guard let hit = windowButton(at: event.location) else { return true }
+            let window = hit.window
+            switch hit.subrole {
+            case "AXFullScreenButton":
+                // En pantalla completa, el botón verde sirve para salir: se deja como está.
+                guard isGreenEnabled, !event.flags.contains(.maskAlternate),
+                      (window.value("AXFullScreen") as Bool?) != true else { return true }
+                swallowMouseUp = true
+                DispatchQueue.main.async { [weak self] in self?.toggleFill(window) }
+                return false
+            case "AXCloseButton":
+                // El clic sigue su camino y la ventana se cierra; después se mira si quedan otras.
+                var pid: pid_t = 0
+                if AXUIElementGetPid(window, &pid) == .success { quitOnClose.closeClicked(pid: pid) }
+                return true
+            default:
+                return true
+            }
         default:
             return true
         }
     }
 
-    /// La ventana cuyo botón verde está bajo el puntero, si lo hay.
-    private func windowOfGreenButton(at point: CGPoint) -> AXUIElement? {
+    /// El botón de ventana bajo el puntero (su subrol: AXCloseButton, AXFullScreenButton…) y su ventana.
+    private func windowButton(at point: CGPoint) -> (subrole: String, window: AXUIElement)? {
         // Antes de preguntar por Accesibilidad (más lento), se comprueba con la lista de ventanas
         // que el clic cae en la esquina superior izquierda de una ventana.
         guard isNearWindowButtons(point) else { return nil }
         var element: AXUIElement?
         guard AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element) == .success,
-              let element, (element.value(kAXSubroleAttribute) as String?) == "AXFullScreenButton",
+              let element, let subrole: String = element.value(kAXSubroleAttribute),
               let window: AXUIElement = element.value(kAXWindowAttribute) else { return nil }
-        // En pantalla completa, el botón verde sirve para salir: se deja como está.
-        if (window.value("AXFullScreen") as Bool?) == true { return nil }
-        return window
+        return (subrole, window)
     }
 
     private func isNearWindowButtons(_ point: CGPoint) -> Bool {
@@ -101,9 +117,9 @@ final class GreenButton {
 }
 
 /// El tap está en el bucle principal, así que se llama en el hilo principal.
-private let greenButtonCallback: CGEventTapCallBack = { _, type, event, refcon in
+private let windowButtonsCallback: CGEventTapCallBack = { _, type, event, refcon in
     guard let refcon else { return Unmanaged.passUnretained(event) }
-    let button = Unmanaged<GreenButton>.fromOpaque(refcon).takeUnretainedValue()
-    let passThrough = MainActor.assumeIsolated { button.handle(type, event) }
+    let buttons = Unmanaged<WindowButtons>.fromOpaque(refcon).takeUnretainedValue()
+    let passThrough = MainActor.assumeIsolated { buttons.handle(type, event) }
     return passThrough ? Unmanaged.passUnretained(event) : nil
 }
