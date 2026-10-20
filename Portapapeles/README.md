@@ -5,6 +5,7 @@ Historial del portapapeles para macOS (14+). Guarda los últimos **100** element
 ## Uso
 
 - **⌥⇧V** abre el panel de historial (también desde el icono 📋 de la barra de menú).
+- **⌥⇧⌘V** pega sin formato: solo el texto, sin tipos de letra, colores ni enlaces, para que tome el formato del lugar donde pegas (útil al copiar de una web a un correo o a un documento). Lo copiado queda guardado también sin formato.
 
 | Tecla | Acción |
 | --- | --- |
@@ -20,7 +21,7 @@ Historial del portapapeles para macOS (14+). Guarda los últimos **100** element
 
 ## Permisos
 
-- **Pegado automático:** necesita el permiso de **Accesibilidad**, que se activa desde el menú › *Activar pegado automático…*. Sin él, al pulsar ↩ el elemento solo se copia y tienes que pegarlo tú con ⌘V.
+- **Pegado automático:** necesita el permiso de **Accesibilidad**, que se activa desde el menú › *Activar pegado automático…*. Sin él, al pulsar ↩ (o ⌥⇧⌘V) el elemento solo se copia y tienes que pegarlo tú con ⌘V.
 - **Lectura del portapapeles:** si macOS pregunta si Portapapeles puede leer lo que copias de otras apps, elige **Permitir siempre**.
 
 ## Privacidad
