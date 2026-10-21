@@ -104,6 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         separator.button?.image = isCollapsed ? nil : Self.lineImage
         updateArrow()
         if isCollapsed {
+            let screen = NSScreen.main.map { "\(Int($0.frame.width))×\(Int($0.frame.height))" } ?? "?"
+            Log.write("Plegar — macOS \(ProcessInfo.processInfo.operatingSystemVersionString), pantalla \(screen), \(statusWindowSummary())")
             // Primero, lo que ocupan ahora los iconos de la izquierda; luego se corrige midiendo.
             let bar = measureBar()
             if let leftmost = bar.leftItems.map(\.minX).min(), let line = bar.line {
@@ -128,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard isCollapsed, fitStepsLeft > 0 else { return }
         fitStepsLeft -= 1
         let bar = measureBar()
+        Log.write("Paso \(12 - fitStepsLeft): largo \(Int(separator.length)), línea \(bar.line.map { "x=\(Int($0.minX)) ancho=\(Int($0.width))" } ?? "no visible"), iconos a la izquierda: \(bar.leftItems.count)")
         if bar.line == nil {
             separator.length = max(Self.separatorLength, separator.length - 24)
         } else if !bar.leftItems.isEmpty {
@@ -136,6 +139,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.fitStep() }
+    }
+
+    /// Cuántas ventanas del nivel de la barra de estado hay y dónde está la línea, para el registro.
+    private func statusWindowSummary() -> String {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        let statusLevel = Int(CGWindowLevelForKey(.statusWindow))
+        let status = list.filter { $0[kCGWindowLayer as String] as? Int == statusLevel }
+        let number = separator.button?.window?.windowNumber ?? -1
+        let ownsLine = list.contains { $0[kCGWindowNumber as String] as? Int == number }
+        let layers = Set(list.compactMap { $0[kCGWindowLayer as String] as? Int }).sorted()
+        return "\(status.count) iconos en la barra (nivel \(statusLevel)), ventana de la línea \(number) \(ownsLine ? "encontrada" : "NO encontrada"), niveles: \(layers)"
     }
 
     /// Posición de la línea en la barra (nil si macOS no la muestra) y de los iconos que están a su izquierda,
@@ -194,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(auto)
         menu.addItem(.separator())
         menu.addItem(item("Cómo elegir qué iconos se agrupan…", #selector(showHelp)))
+        menu.addItem(item("Ver registro", #selector(openLog)))
         let login = item("Abrir al iniciar sesión", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
@@ -231,6 +246,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: "Entendido")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
+    }
+
+    @objc private func openLog() {
+        if !FileManager.default.fileExists(atPath: Log.url.path) { Log.write("Registro vacío: todavía no se plegó la barra") }
+        NSWorkspace.shared.open(Log.url)
     }
 
     private func showMisplacedWarning() {
