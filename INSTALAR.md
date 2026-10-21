@@ -1,6 +1,6 @@
 # Cómo instalar las apps
 
-Hay seis apps. Instala las que quieras:
+Hay siete apps. Instala las que quieras:
 
 | App | Para qué sirve | Necesita |
 | --- | --- | --- |
@@ -9,6 +9,7 @@ Hay seis apps. Instala las que quieras:
 | **Puntos** | Bloc de 7 notas de colores para apuntar cosas rápido (⌥⇧N) | macOS 14 o posterior |
 | **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
 | **Ventanas** | El botón verde agranda la ventana sin pasar a pantalla completa, y el rojo cierra del todo las apps que elijas | macOS 14 o posterior |
+| **Volumen** | Cambiar el volumen de cada app por separado (bajar la música sin bajar una llamada) | macOS 14.2 o posterior |
 | **Historietas** | Leer cómics y manga en formato CBZ, CBR, CB7 y CBT | macOS 14 o posterior |
 
 Funcionan en cualquier Mac con chip Apple (M1, M2, M3, M4, M5…).
@@ -31,11 +32,12 @@ Solo hay que hacerlo una vez por app.
 
 ## 3. Dar los permisos
 
-Captura, Portapapeles, Puntos, Monitor y Ventanas viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas sí aparece en el Dock, como cualquier app con ventanas.
+Captura, Portapapeles, Puntos, Monitor, Ventanas y Volumen viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas sí aparece en el Dock, como cualquier app con ventanas.
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
 - **Ventanas:** pide permiso de **Accesibilidad** para mover y cerrar las ventanas de otras apps. Actívalo en Ajustes; no hace falta reiniciarla. El botón rojo cierra la app en todas las apps; desde su menú puedes elegir solo algunas.
+- **Volumen:** la primera vez que cambies un volumen, pedirá permiso para **grabar el audio del sistema** (lo necesita para cambiar el volumen; no graba nada). Si no lo das, esa app queda en silencio hasta que la vuelvas al 100 %.
 - **Puntos**, **Monitor** e **Historietas:** no necesitan permisos.
 
 En el menú de las apps de la barra de menú puedes activar **Abrir al iniciar sesión** para que arranque sola.

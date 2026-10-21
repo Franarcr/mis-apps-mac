@@ -9,6 +9,7 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 | [Puntos](Puntos/) | Bloc de 7 notas con Markdown en vivo, al estilo de Tot (⌥⇧N) | 14+ |
 | [Monitor](Monitor/) | Widget de escritorio con CPU, memoria, GPU, red, disco, batería y procesos en tiempo real | 14+ |
 | [Ventanas](Ventanas/) | El botón verde agranda la ventana sin pantalla completa, y el rojo cierra del todo las apps que elijas | 14+ |
+| [Volumen](Volumen/) | Volumen de cada app por separado, de silencio a 150 % | 14.2+ |
 | [Historietas](Historietas/) | Lector de cómics CBZ, CBR, CB7 y CBT, con doble página, lectura de manga y la página por la que ibas | 14+ |
 
 Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md).
