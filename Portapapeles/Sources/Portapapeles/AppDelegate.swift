@@ -18,6 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        BarraLink.connect(statusItem) { [weak self] in
+            if let menu = self?.statusItem.menu { BarraLink.popUp(menu) }
+        }
 
         let ok = hotKeys.register(keyCode: kVK_ANSI_V, modifiers: UInt32(optionKey | shiftKey)) { [weak self] in
             self?.history.toggle()

@@ -1,16 +1,21 @@
 # Barra
 
-App de barra de menú para macOS (14+) para tener menos iconos en la barra de menús, sobre todo en los MacBook con *notch*, donde los que no caben quedan tapados.
+App de barra de menú para macOS (14+) que junta en un solo icono las demás apps de barra de menús de este repositorio (Captura, Portapapeles, Puntos, Monitor, Ventanas y Volumen), para que la barra no se llene, sobre todo en los MacBook con *notch*.
 
-- Un clic en su icono muestra todas las apps que tienen icono en la barra, cada una con una marca.
-- **Desmarcar** una app la cierra, y su icono desaparece. **Marcarla** la vuelve a abrir.
-- Las apps de barra de menús que desmarcaste (las que solo viven en la barra, como Captura o Creative Cloud) se vuelven a cerrar solas si se abren al iniciar sesión.
-- Las apps normales con icono en la barra (como Edge) aparecen con *(cierra la app)*: al desmarcarlas se cierra la app entera. Se pueden volver a abrir cuando quieras; no se cierran solas.
-- *Ocultar iconos sin cerrar las apps…* abre Ajustes del Sistema › Barra de menús, donde macOS deja esconder iconos sin cerrar la app.
+- Un clic en su icono muestra la lista de esas apps, cada una con una marca.
+- **Desmarcar** una app esconde su icono de la barra, pero la app **sigue funcionando**: sus atajos de teclado (por ejemplo ⌥⇧2 de Captura o ⌥⇧V de Portapapeles) y todo lo que hace siguen igual.
+- Las apps escondidas aparecen en *Abrir el menú de*: al elegir una, se abre su menú donde está el puntero, con todas sus opciones.
+- **Marcarla** de nuevo vuelve a mostrar su icono.
+- Se recuerda aunque reinicies el Mac: cada app guarda si su icono va escondido.
+- Captura muestra su icono mientras graba aunque esté escondido, porque es el botón para detener la grabación.
 
-## Por qué cierra las apps en lugar de esconder su icono
+## Iconos de otras apps
 
-En las versiones recientes de macOS, una app no puede esconder el icono de otra: el sistema decide cómo se colocan. La primera versión de Barra lo intentaba con el truco de Hidden Bar (estirar un separador para empujar los iconos fuera de la pantalla) y no funcionaba. Cerrar la app sí funciona siempre, y para esconder sin cerrar está la opción de Ajustes.
+macOS no deja que una app esconda el icono de otra. Para esos (Edge, Creative Cloud…) está *Esconder iconos de otras apps…*, que abre **Ajustes del Sistema › Barra de menús**, donde cada app tiene su interruptor y el icono se esconde sin cerrar la app.
+
+## Cómo funciona
+
+Cada app de barra de menús incluye `BarraLink.swift` (igual en todas). Barra guarda `iconHidden` en las preferencias de la app y le avisa con una notificación distribuida (`com.fran.barra.setHidden`); la app esconde su icono con `NSStatusItem.isVisible`. Para abrir su menú, Barra envía `com.fran.barra.showMenu` y la app lo muestra donde está el puntero.
 
 No necesita permisos.
 
@@ -19,5 +24,7 @@ No necesita permisos.
 ```bash
 ./build.sh    # compila e instala en /Applications
 ```
+
+Después de instalar Barra por primera vez, vuelve a compilar las apps que quieras esconder (`./build.sh` en cada carpeta) para que incluyan la conexión con Barra.
 
 La primera vez, `build.sh` genera el icono con [../iconos/crear-icono.swift](../iconos/crear-icono.swift).

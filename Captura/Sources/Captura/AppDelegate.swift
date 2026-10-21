@@ -66,6 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Salir de Captura", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
+        BarraLink.connect(statusItem) { [weak self] in
+            if let menu = self?.menu { BarraLink.popUp(menu) }
+        }
     }
 
     private func showIdleIcon() {
@@ -83,6 +86,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         recordingTimer?.invalidate()
         recordingTimer = nil
         if recording {
+            // Mientras graba, el icono se ve aunque esté escondido con Barra: es el botón para detener.
+            statusItem.isVisible = true
             statusItem.menu = nil
             button.target = self
             button.action = #selector(stopRecording)
@@ -100,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             button.action = nil
             statusItem.menu = menu
+            statusItem.isVisible = !BarraLink.isHidden
             showIdleIcon()
         }
     }

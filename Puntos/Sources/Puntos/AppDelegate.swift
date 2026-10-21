@@ -30,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.target = self
         statusItem.button?.action = #selector(statusItemClicked)
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        BarraLink.connect(statusItem) { [weak self] in
+            if let menu = self?.statusMenu { BarraLink.popUp(menu) }
+        }
 
         if !hotKeys.register(keyCode: kVK_ANSI_N, modifiers: UInt32(optionKey | shiftKey), handler: { [weak self] in
             self?.toggleWindow()
