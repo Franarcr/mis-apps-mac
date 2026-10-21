@@ -11,7 +11,7 @@ App de barra de menú para macOS (14+) que agrupa los iconos de la barra de men�
 
 ## Cómo funciona
 
-Al plegar, la línea se estira hasta 10 000 puntos y empuja fuera de la pantalla los iconos que tiene a su izquierda. Es el mismo truco que usa Hidden Bar. Si la línea quedara a la derecha de la flecha, la app avisa en lugar de esconder la flecha.
+Al plegar, la línea se estira hasta ocupar todo el sitio libre de la barra, y los iconos que tiene a su izquierda dejan de caber. No puede estirarse de más: en las versiones recientes de macOS, un elemento que no cabe se descarta él mismo en lugar de apartar a los demás. Por eso Barra mide la barra (posición de cada icono) y ajusta el largo en unos pocos pasos, y lo vuelve a ajustar al cambiar de app, porque cada app tiene un menú de distinto ancho. Si la línea quedara a la derecha de la flecha, la app avisa en lugar de esconder la flecha.
 
 No necesita permisos.
 

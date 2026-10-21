@@ -3,18 +3,23 @@ import ServiceManagement
 
 /// Agrupa los iconos de la barra de menús. Pone dos elementos: una flecha y, a su izquierda, una línea.
 /// Los iconos que el usuario arrastra (con ⌘) a la izquierda de la línea se esconden al «plegar»:
-/// la línea se estira hasta 10 000 puntos y los empuja fuera de la pantalla. Los que quedan a la derecha
+/// la línea se estira hasta ocupar todo el sitio libre y ya no caben. Los que quedan a la derecha
 /// de la flecha (como Captura) se ven siempre.
+///
+/// La línea no puede medir más que el sitio libre: si no cabe, macOS la descarta a ella en lugar de
+/// apartar los otros iconos. Por eso se ajusta midiendo la barra, y se vuelve a ajustar al cambiar
+/// de app (cada app tiene un menú de distinto ancho y deja más o menos sitio).
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private static let separatorLength: CGFloat = 14
-    private static let collapsedLength: CGFloat = 10_000
     private static let autoCollapseDelay: TimeInterval = 10
 
     private var arrow: NSStatusItem!
     private var separator: NSStatusItem!
     private var isCollapsed = false
     private var autoCollapseTimer: Timer?
+    /// Pasos que quedan para ajustar el largo de la línea plegada.
+    private var fitStepsLeft = 0
     private let optionsMenu = NSMenu()
 
     /// Volver a esconder los iconos solos unos segundos después de mostrarlos.
@@ -41,6 +46,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         optionsMenu.delegate = self
         updateArrow()
+
+        // Al cambiar de app o de pantalla cambia el sitio libre en la barra.
+        _ = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refit() }
+        }
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refit() }
+        }
 
         if UserDefaults.standard.bool(forKey: "helpShown") {
             // Se espera a que la barra coloque los elementos antes de comprobar sus posiciones.
@@ -86,9 +101,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func applyLayout() {
-        separator.length = isCollapsed ? Self.collapsedLength : Self.separatorLength
         separator.button?.image = isCollapsed ? nil : Self.lineImage
         updateArrow()
+        if isCollapsed {
+            // Primero, lo que ocupan ahora los iconos de la izquierda; luego se corrige midiendo.
+            let bar = measureBar()
+            if let leftmost = bar.leftItems.map(\.minX).min(), let line = bar.line {
+                separator.length = Self.separatorLength + line.minX - leftmost + 4
+            }
+            refit()
+        } else {
+            fitStepsLeft = 0
+            separator.length = Self.separatorLength
+        }
+    }
+
+    private func refit() {
+        guard isCollapsed else { return }
+        fitStepsLeft = 12
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.fitStep() }
+    }
+
+    /// Un paso del ajuste: si quedan iconos a la izquierda de la línea, la alarga lo que ocupan;
+    /// si la línea no cabe (macOS la ha quitado), la acorta. Se repite hasta que no quede ninguno.
+    private func fitStep() {
+        guard isCollapsed, fitStepsLeft > 0 else { return }
+        fitStepsLeft -= 1
+        let bar = measureBar()
+        if bar.line == nil {
+            separator.length = max(Self.separatorLength, separator.length - 24)
+        } else if !bar.leftItems.isEmpty {
+            separator.length += bar.leftItems.map(\.width).reduce(0, +) + CGFloat(bar.leftItems.count) * 4
+        } else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.fitStep() }
+    }
+
+    /// Posición de la línea en la barra (nil si macOS no la muestra) y de los iconos que están a su izquierda,
+    /// en coordenadas de pantalla con el origen arriba a la izquierda.
+    private func measureBar() -> (line: CGRect?, leftItems: [CGRect]) {
+        guard let number = separator.button?.window?.windowNumber,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return (nil, [])
+        }
+        func frame(_ info: [String: Any]) -> CGRect? {
+            (info[kCGWindowBounds as String] as? NSDictionary).flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }
+        }
+        guard let lineInfo = list.first(where: { $0[kCGWindowNumber as String] as? Int == number }),
+              let line = frame(lineInfo), line.width > 1 else { return (nil, []) }
+        // Los iconos de la barra son ventanas del nivel de la barra de estado, en la misma fila que la línea.
+        let statusLevel = Int(CGWindowLevelForKey(.statusWindow))
+        let left = list.filter { info in
+            info[kCGWindowLayer as String] as? Int == statusLevel && info[kCGWindowNumber as String] as? Int != number
+        }.compactMap(frame).filter { item in
+            abs(item.minY - line.minY) < 2 && item.maxX <= line.minX + 2 && item.width < 400 && item.maxX > 0
+        }
+        return (line, left)
     }
 
     private var separatorIsLeftOfArrow: Bool {
