@@ -23,12 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.history.toggle()
         }
         if !ok { Toast.show("El atajo ⌥⇧V ya está en uso", detail: "Abre el historial desde la barra de menú.") }
+        hotKeys.register(keyCode: kVK_ANSI_V, modifiers: UInt32(cmdKey | optionKey | shiftKey)) { [weak self] in
+            self?.pastePlainText()
+        }
     }
 
     // El menú se reconstruye cada vez que se abre para mostrar lo último copiado.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.addItem(item("Mostrar historial", #selector(showHistory), key: "v"))
+        let plain = item("Pegar sin formato", #selector(pastePlainText), key: "v")
+        plain.keyEquivalentModifierMask = [.command, .option, .shift]
+        menu.addItem(plain)
         menu.addItem(.separator())
 
         let recent = store.items.prefix(10)
@@ -71,6 +77,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showHistory() { history.show() }
+
+    /// ⌥⇧⌘V: pega lo copiado solo como texto, con el formato del lugar donde se pega.
+    @objc private func pastePlainText() {
+        if store.makePlainText() {
+            Paster.paste()
+        } else {
+            Toast.show("No hay texto copiado", detail: "Pegar sin formato solo funciona con texto.")
+        }
+    }
 
     @objc private func copyRecent(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID,

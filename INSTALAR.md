@@ -1,13 +1,14 @@
 # Cómo instalar las apps
 
-Hay cinco apps. Instala las que quieras:
+Hay seis apps. Instala las que quieras:
 
 | App | Para qué sirve | Necesita |
 | --- | --- | --- |
 | **Captura** | Capturas de pantalla con flechas, cuadros y texto, OCR, vídeo con sonido, GIF y capturas largas con desplazamiento | macOS 15 o posterior |
-| **Portapapeles** | Guarda las últimas 100 cosas que copias | macOS 14 o posterior |
+| **Portapapeles** | Guarda las últimas 100 cosas que copias, y pega sin formato | macOS 14 o posterior |
 | **Puntos** | Bloc de 7 notas de colores para apuntar cosas rápido (⌥⇧N) | macOS 14 o posterior |
 | **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
+| **Ventanas** | El botón verde agranda la ventana sin pasar a pantalla completa, y el rojo cierra del todo las apps que elijas | macOS 14 o posterior |
 | **Historietas** | Leer cómics y manga en formato CBZ, CBR, CB7 y CBT | macOS 14 o posterior |
 
 Funcionan en cualquier Mac con chip Apple (M1, M2, M3, M4, M5…).
@@ -30,10 +31,11 @@ Solo hay que hacerlo una vez por app.
 
 ## 3. Dar los permisos
 
-Captura, Portapapeles, Puntos y Monitor viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas sí aparece en el Dock, como cualquier app con ventanas.
+Captura, Portapapeles, Puntos, Monitor y Ventanas viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas sí aparece en el Dock, como cualquier app con ventanas.
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
+- **Ventanas:** pide permiso de **Accesibilidad** para mover y cerrar las ventanas de otras apps. Actívalo en Ajustes; no hace falta reiniciarla. El botón rojo cierra la app en todas las apps; desde su menú puedes elegir solo algunas.
 - **Puntos**, **Monitor** e **Historietas:** no necesitan permisos.
 
 En el menú de las apps de la barra de menú puedes activar **Abrir al iniciar sesión** para que arranque sola.
@@ -58,6 +60,7 @@ Para poner flechas, cuadros o texto en una captura, pulsa ✏️ en la miniatura
 | Atajo | Acción |
 | --- | --- |
 | ⌥⇧V | Abrir el historial |
+| ⌥⇧⌘V | Pegar sin formato (solo el texto) |
 | ↑ ↓ | Moverte por la lista |
 | ↩ | Pegar |
 | Escribir | Buscar |

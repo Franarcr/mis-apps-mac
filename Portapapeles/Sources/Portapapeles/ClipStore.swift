@@ -143,6 +143,17 @@ final class ClipStore: ObservableObject {
         }
     }
 
+    /// Deja en el portapapeles solo el texto de lo copiado (sin tipos de letra, colores ni enlaces).
+    /// Devuelve false si lo copiado no es texto.
+    func makePlainText() -> Bool {
+        let pb = NSPasteboard.general
+        guard let string = pb.string(forType: .string), !string.isEmpty else { return false }
+        pb.clearContents()
+        pb.setString(string, forType: .string)
+        lastChange = pb.changeCount
+        return true
+    }
+
     func togglePin(_ item: ClipItem) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         items[index].pinned.toggle()
