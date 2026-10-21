@@ -10,7 +10,7 @@ Hay ocho apps. Instala las que quieras:
 | **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
 | **Ventanas** | El botón verde agranda la ventana sin pasar a pantalla completa, y el rojo cierra del todo las apps que elijas | macOS 14 o posterior |
 | **Volumen** | Cambiar el volumen de cada app por separado (bajar la música sin bajar una llamada) | macOS 14.2 o posterior |
-| **Barra** | Agrupar los iconos de la barra de menús para que no ocupen tanto, y mostrarlos con un clic | macOS 14 o posterior |
+| **Barra** | Ver todas las apps con icono en la barra de menús y apagar con un clic las que no quieres ver | macOS 14 o posterior |
 | **Historietas** | Leer cómics y manga en formato CBZ, CBR, CB7 y CBT | macOS 14 o posterior |
 
 Funcionan en cualquier Mac con chip Apple (M1, M2, M3, M4, M5…).
@@ -39,7 +39,7 @@ Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen y Barra viven en la **
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
 - **Ventanas:** pide permiso de **Accesibilidad** para mover y cerrar las ventanas de otras apps. Actívalo en Ajustes; no hace falta reiniciarla. El botón rojo cierra la app en todas las apps; desde su menú puedes elegir solo algunas.
 - **Volumen:** la primera vez que cambies un volumen, pedirá permiso para **grabar el audio del sistema** (lo necesita para cambiar el volumen; no graba nada). Si no lo das, esa app queda en silencio hasta que la vuelvas al 100 %.
-- **Barra:** no necesita permisos. La primera vez explica cómo elegir qué iconos se agrupan: mantén ⌘ y arrástralos a la izquierda de la línea │.
+- **Barra:** no necesita permisos. Desmarca en su menú las apps que no quieres en la barra: se cierran y su icono desaparece.
 - **Puntos**, **Monitor** e **Historietas:** no necesitan permisos.
 
 En el menú de las apps de la barra de menú puedes activar **Abrir al iniciar sesión** para que arranque sola.
