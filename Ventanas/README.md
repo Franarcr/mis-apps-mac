@@ -13,6 +13,10 @@ Necesita el permiso de **Accesibilidad** para ver y mover las ventanas de otras 
 
 - macOS solo informa de las ventanas del escritorio (Space) actual. Si una app elegida tiene ventanas en otro escritorio y cierras con el botón rojo la última del escritorio actual, la app se cierra igual.
 
+## Si una app no se cierra con el botón rojo
+
+En el menú › *Ver registro del botón rojo* se abre `~/Library/Logs/Ventanas.log`, que anota cada clic: si se reconoció el botón rojo y cuántas ventanas le quedaban a la app.
+
 ## Compilar
 
 ```bash

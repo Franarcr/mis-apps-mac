@@ -77,25 +77,36 @@ final class WindowButtons {
     private func windowButton(at point: CGPoint) -> (subrole: String, window: AXUIElement)? {
         // Antes de preguntar por Accesibilidad (más lento), se comprueba con la lista de ventanas
         // que el clic cae en la esquina superior izquierda de una ventana.
-        guard isNearWindowButtons(point) else { return nil }
+        guard let owner = windowOwnerNearButtons(point) else { return nil }
         var element: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element) == .success,
-              let element, let subrole: String = element.value(kAXSubroleAttribute),
-              let window: AXUIElement = element.value(kAXWindowAttribute) else { return nil }
+        let status = AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element)
+        guard status == .success, let element else {
+            Log.write("\(owner): Accesibilidad no responde en ese punto (error \(status.rawValue))")
+            return nil
+        }
+        let subrole: String? = element.value(kAXSubroleAttribute)
+        guard let subrole, let window: AXUIElement = element.value(kAXWindowAttribute) else {
+            let role: String = element.value(kAXRoleAttribute) ?? "?"
+            Log.write("\(owner): clic cerca de los botones, pero no en uno (rol \(role), subrol \(subrole ?? "?"))")
+            return nil
+        }
+        if subrole == "AXCloseButton" { Log.write("\(owner): botón rojo") }
         return (subrole, window)
     }
 
-    private func isNearWindowButtons(_ point: CGPoint) -> Bool {
+    /// Si el clic cae en la esquina de los botones de una ventana, el nombre de su app.
+    private func windowOwnerNearButtons(_ point: CGPoint) -> String? {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] else { return false }
+            as? [[String: Any]] else { return nil }
         // La lista va de delante hacia atrás: cuenta la primera ventana normal bajo el puntero.
         for info in list where info[kCGWindowLayer as String] as? Int == 0 {
             guard let bounds = info[kCGWindowBounds as String] as? NSDictionary,
                   let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary),
                   rect.contains(point) else { continue }
-            return point.x - rect.minX < 120 && point.y - rect.minY < 60
+            guard point.x - rect.minX < 120 && point.y - rect.minY < 60 else { return nil }
+            return info[kCGWindowOwnerName as String] as? String ?? "?"
         }
-        return false
+        return nil
     }
 
     private func toggleFill(_ window: AXUIElement) {

@@ -57,6 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         quit.submenu = quitOnCloseMenu()
         menu.addItem(quit)
 
+        menu.addItem(item("Ver registro del botón rojo", #selector(openLog)))
+
         menu.addItem(.separator())
         let login = item("Abrir al iniciar sesión", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -115,6 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleGreenButton() { buttons.isGreenEnabled.toggle() }
 
     @objc private func toggleAllApps() { quitOnClose.allApps.toggle() }
+
+    @objc private func openLog() {
+        if !FileManager.default.fileExists(atPath: Log.url.path) { Log.write("Registro vacío: todavía no se pulsó ningún botón rojo") }
+        NSWorkspace.shared.open(Log.url)
+    }
 
     @objc private func toggleQuitOnClose(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
