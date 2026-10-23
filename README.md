@@ -36,3 +36,7 @@ Para generar los `.zip` y las instrucciones en `dist/`:
 ```
 
 Los iconos se generan con [iconos/crear-icono.swift](iconos/crear-icono.swift).
+
+## Otras herramientas
+
+- [FormsMCP](FormsMCP/): servidor MCP para que Claude Desktop lea los formularios, menús y librerías de Oracle Forms (convertidos con `frmf2xml`), junto al SQLcl MCP.

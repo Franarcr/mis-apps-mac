@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Module version="141200000" xmlns="http://xmlns.oracle.com/Forms">
+   <FormModule Name="CLIENTES" Title="Mantenimiento de clientes" ConsoleWindow="VENTANA">
+      <Coordinate CharacterCellWidth="7" CharacterCellHeight="14" CoordinateSystem="Real" RealUnit="Pixel"/>
+      <AttachedLibrary Name="UTIL" LibraryLocation="UTIL.pll" LibrarySource="File"/>
+      <Alert Name="CONFIRMAR" AlertMessage="¿Guardar los cambios?" AlertStyle="Caution"/>
+      <Block Name="CLIENTES" QueryDataSourceName="CLIENTES" DMLDataTargetName="CLIENTES" WhereClause="ACTIVO = 'S'" OrderByClause="NOMBRE" RecordsDisplayCount="10">
+         <Item Name="ID" ItemType="Text Item" ColumnName="ID" DataType="Number" Prompt="Código" Required="true" XPosition="20" YPosition="40" Width="60" Height="20" FontName="Tahoma"/>
+         <Item Name="NOMBRE" ItemType="Text Item" ColumnName="NOMBRE" DataType="Char" Prompt="Nombre" MaximumLength="80">
+            <Trigger Name="WHEN-VALIDATE-ITEM" TriggerText="BEGIN&#10;  IF :CLIENTES.NOMBRE IS NULL THEN&#10;    MESSAGE('El nombre es obligatorio');&#10;    RAISE FORM_TRIGGER_FAILURE;&#10;  END IF;&#10;  :CLIENTES.NOMBRE := UPPER(:CLIENTES.NOMBRE);&#10;END;"/>
+         </Item>
+         <Item Name="PAIS" ItemType="Text Item" ColumnName="PAIS_ID" DataType="Number" Prompt="País" LovName="LOV_PAISES"/>
+         <Item Name="DESC_PAIS" ItemType="Display Item" DatabaseItem="false" Prompt="Descripción"/>
+         <Item Name="BTN_GUARDAR" ItemType="Push Button" DatabaseItem="false" Label="Guardar">
+            <Trigger Name="WHEN-BUTTON-PRESSED" TriggerText="IF SHOW_ALERT('CONFIRMAR') = ALERT_BUTTON1 THEN&#10;  COMMIT_FORM;&#10;END IF;"/>
+         </Item>
+         <Trigger Name="POST-QUERY" TriggerText="SELECT NOMBRE INTO :CLIENTES.DESC_PAIS&#10;  FROM PAISES WHERE ID = :CLIENTES.PAIS;"/>
+         <Relation Name="CLIENTES_FACTURAS" DetailBlock="FACTURAS" JoinCondition="FACTURAS.CLIENTE_ID = CLIENTES.ID"/>
+      </Block>
+      <Block Name="FACTURAS" QueryDataSourceName="FACTURAS">
+         <Item Name="NUMERO" ItemType="Text Item" ColumnName="NUMERO" DataType="Number"/>
+         <Item Name="TOTAL" ItemType="Text Item" ColumnName="TOTAL" DataType="Number">
+            <Trigger Name="WHEN-VALIDATE-ITEM" TriggerText="PKG_FACTURAS.VALIDAR_TOTAL(:FACTURAS.TOTAL);"/>
+         </Item>
+      </Block>
+      <Canvas Name="CANVAS_PRINCIPAL" WindowName="VENTANA" Width="800" Height="600"/>
+      <LOV Name="LOV_PAISES" RecordGroupName="RG_PAISES" Title="Países">
+         <LOVColumnMapping Name="NOMBRE" Title="Nombre" ReturnItem="CLIENTES.DESC_PAIS"/>
+      </LOV>
+      <ProgramUnit Name="VALIDAR_CLIENTE" ProgramUnitType="Procedure" ProgramUnitText="PROCEDURE VALIDAR_CLIENTE IS&#10;BEGIN&#10;  IF :CLIENTES.ID IS NULL THEN&#10;    SELECT SEQ_CLIENTES.NEXTVAL INTO :CLIENTES.ID FROM DUAL;&#10;  END IF;&#10;END;"/>
+      <RecordGroup Name="RG_PAISES" RecordGroupType="Query" RecordGroupQuery="SELECT NOMBRE, ID FROM PAISES ORDER BY NOMBRE"/>
+      <Trigger Name="WHEN-NEW-FORM-INSTANCE" TriggerText="SET_WINDOW_PROPERTY('VENTANA', WINDOW_STATE, MAXIMIZE);&#10;GO_BLOCK('CLIENTES');&#10;EXECUTE_QUERY;"/>
+      <Window Name="VENTANA" Title="Clientes" Width="800" Height="600"/>
+      <ModuleParameter Name="P_CLIENTE_ID" ParameterDataType="Number"/>
+   </FormModule>
+</Module>

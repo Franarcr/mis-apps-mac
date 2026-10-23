@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Module version="141200000" xmlns="http://xmlns.oracle.com/Forms">
+   <MenuModule Name="MENU_PRINCIPAL" MainMenu="MENU">
+      <Menu Name="MENU">
+         <MenuItem Name="CLIENTES" Label="Clientes" CommandType="PL/SQL" CommandText="CALL_FORM('CLIENTES');"/>
+      </Menu>
+   </MenuModule>
+</Module>
