@@ -41,6 +41,21 @@ powershell -ExecutionPolicy Bypass -File convertir.ps1 -Origen C:\ruta\a\los\for
 
 Vuelve a ejecutarlo cuando cambien los forms.
 
+### Sin el script (solo cmd)
+
+Si en el servidor no se pueden ejecutar scripts, basta con `frmf2xml`, que viene con Forms. Conviene trabajar sobre una copia, porque `frmf2xml` escribe el XML junto a cada archivo:
+
+```cmd
+mkdir C:\temp\forms_xml
+copy C:\ruta\a\los\forms\*.fmb C:\temp\forms_xml\
+cd /d C:\temp\forms_xml
+frmf2xml OVERWRITE=YES USE_PROPERTY_IDS=NO UN_FORM.fmb
+for %f in (*.fmb *.mmb *.olb) do frmf2xml OVERWRITE=YES USE_PROPERTY_IDS=NO "%f"
+del *.fmb *.mmb *.olb
+```
+
+La cuarta línea prueba con un solo form; la quinta convierte todos. Si `frmf2xml` no se reconoce, `where /r C:\ frmf2xml.bat` dice dónde está. Dentro de un archivo `.bat`, `%f` se escribe `%%f`.
+
 ## 2. Copiar la carpeta a la Mac
 
 Copia la carpeta `xml` a la Mac (OneDrive, Google Drive, un pendrive…), por ejemplo a `~/FormsXML`.
