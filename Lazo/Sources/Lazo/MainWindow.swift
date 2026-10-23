@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 
 /// Estado de la ventana principal (en una clase porque `@State` necesita las macros de Xcode).
@@ -107,13 +108,25 @@ final class AppModel: ObservableObject {
         targetIcon = app?.icon
     }
 
+    /// Fondo de escritorio en miniatura (900 px como mucho): la vista previa no necesita más, y la imagen
+    /// completa de un fondo puede ocupar decenas de MB en memoria.
     func wallpaper(for screen: NSScreen) -> NSImage? {
         guard showWallpaper, let id = screen.displayID else { return nil }
         if let cached = wallpapers[id] { return cached }
-        guard let url = NSWorkspace.shared.desktopImageURL(for: screen), let image = NSImage(contentsOf: url) else { return nil }
+        guard let url = NSWorkspace.shared.desktopImageURL(for: screen),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceThumbnailMaxPixelSize: 900,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
+              ] as CFDictionary) else { return nil }
+        let image = NSImage(cgImage: thumbnail, size: .zero)
         wallpapers[id] = image
         return image
     }
+
+    /// Libera las miniaturas (al cerrar la ventana).
+    func releaseImages() { wallpapers.removeAll() }
 
     /// Termina un arrastre sobre la cuadrícula: guarda una distribución (modo Grabar) o coloca la ventana.
     func finishSelection(on screen: NSScreen, c0: Int, r0: Int, c1: Int, r1: Int) {
@@ -202,6 +215,7 @@ extension NSScreen {
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var store: LayoutStore
+    @ObservedObject var workspace: Workspace
 
     var body: some View {
         HStack(spacing: 0) {
@@ -214,6 +228,8 @@ struct MainView: View {
                 TargetHeader(model: model)
                 Divider()
                 ScreensArea(model: model)
+                Divider()
+                WorkspaceBar(workspace: workspace)
                 Divider()
                 SettingsBar(model: model)
             }
@@ -531,6 +547,46 @@ private struct LayoutRow: View {
             Divider()
             Button("Eliminar", role: .destructive) { store.layouts.removeAll { $0.id == layout.id } }
         }
+    }
+}
+
+// MARK: Escritorio
+
+private struct WorkspaceBar: View {
+    @ObservedObject var workspace: Workspace
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "rectangle.3.group").foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Escritorio guardado").font(.callout.weight(.semibold))
+                Group {
+                    if let status = workspace.status {
+                        Text(status)
+                    } else if let snapshot = workspace.snapshot {
+                        Text("\(snapshot.entries.count) ventanas · \(snapshot.date.formatted(date: .abbreviated, time: .shortened))")
+                    } else {
+                        Text("Guarda dónde está cada ventana para volver a dejarlo igual")
+                    }
+                }
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Button("Guardar escritorio") { workspace.save() }
+            Button("Restaurar (⌥⇧R)") { workspace.restore() }
+                .disabled(workspace.snapshot == nil)
+            Toggle("Abrir las apps que falten", isOn: $workspace.openMissingApps)
+            Toggle("Restaurar al iniciar sesión", isOn: Binding(
+                get: { workspace.restoreAtLogin },
+                set: { on in
+                    workspace.restoreAtLogin = on
+                    // Para restaurar al iniciar sesión, Lazo tiene que abrirse sola.
+                    if on, SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
+                }))
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
     }
 }
 

@@ -6,6 +6,9 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let store = LayoutStore()
+    private let workspace = Workspace()
+    /// Restaurar el escritorio guardado desde cualquier app.
+    private let restoreShortcut = Shortcut(keyCode: kVK_ANSI_R, modifiers: optionKey | shiftKey)
     private lazy var model = AppModel(store: store)
     private var window: NSWindow!
     private let hotKeys = HotKeyManager()
@@ -43,7 +46,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } else {
             waitForPermission()
         }
-        showWindow(fromShortcut: false)
+        // Abierta al iniciar sesión: se queda en segundo plano (solo atajos), sin abrir la ventana,
+        // y si se pidió, vuelve a dejar el escritorio como estaba (dando tiempo a que abran las apps).
+        if launchedAsLoginItem {
+            Log.write("Lazo abierta al iniciar sesión")
+            if workspace.restoreAtLogin {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in self?.workspace.restore(wait: 60) }
+            }
+        } else {
+            showWindow(fromShortcut: false)
+        }
+    }
+
+    private var launchedAsLoginItem: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
+        return event.eventID == kAEOpenApplication
+            && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
     }
 
     /// Clic en el icono del Dock (o abrir la app otra vez): se muestra la ventana.
@@ -63,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.title = "Lazo"
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.contentView = NSHostingView(rootView: MainView(model: model, store: store))
+        window.contentView = NSHostingView(rootView: MainView(model: model, store: store, workspace: workspace))
         window.setFrameAutosaveName("LazoWindow")
     }
 
@@ -96,6 +114,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.recordingShortcutFor = nil
     }
 
+    func windowWillClose(_ notification: Notification) {
+        model.releaseImages()
+    }
+
     // MARK: Atajos
 
     private func registerShortcuts() {
@@ -114,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             GridOverlay.show(model: self.model)
         }
         register(openShortcut, "abrir Lazo") { [weak self] in self?.showWindow(fromShortcut: true) }
+        register(restoreShortcut, "restaurar escritorio") { [weak self] in self?.workspace.restore() }
         for layout in store.layouts {
             guard let shortcut = layout.shortcut else { continue }
             let id = layout.id
@@ -210,6 +233,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func resetLayouts() { store.layouts = SavedLayout.defaults }
+    @objc private func saveWorkspace() { workspace.save() }
+    @objc private func restoreWorkspace() { workspace.restore() }
 
     @objc private func toggleLogin(_ sender: NSMenuItem) {
         do {
@@ -240,9 +265,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             item("Ocultar Lazo", #selector(NSApplication.hide(_:)), "h"),
             item("Salir de Lazo", #selector(NSApplication.terminate(_:)), "q"),
         ])
+        submenu("Escritorio", [
+            item("Guardar escritorio", #selector(saveWorkspace), "s", target: self),
+            item("Restaurar escritorio (⌥⇧R)", #selector(restoreWorkspace), "r", target: self),
+        ])
         submenu("Distribuciones", [
             item("Importar…", #selector(importLayouts), "o", target: self),
-            item("Exportar…", #selector(exportLayouts), "s", target: self),
+            item("Exportar…", #selector(exportLayouts), "e", target: self),
             .separator(),
             item("Restablecer las de serie", #selector(resetLayouts), target: self),
         ])

@@ -28,7 +28,7 @@ enum WindowControl {
     /// Ventanas visibles (no minimizadas) de las apps abiertas, para elegir cuál colocar.
     /// No se filtra por tipo de ventana: algunas apps (WhatsApp, por ejemplo) no declaran la ventana como
     /// "estándar". Si una app no informa de sus ventanas, se usa su ventana principal o la activa.
-    static func listWindows() -> [(window: AXUIElement, app: NSRunningApplication, title: String)] {
+    static func listWindows(log: Bool = true) -> [(window: AXUIElement, app: NSRunningApplication, title: String)] {
         var result: [(AXUIElement, NSRunningApplication, String)] = []
         var report: [String] = []
         for app in NSWorkspace.shared.runningApplications
@@ -47,7 +47,7 @@ enum WindowControl {
             }
             report.append("\(app.localizedName ?? "?") \(kept)/\(windows.count)")
         }
-        Log.write("Ventanas (incluidas/total por app): " + report.joined(separator: ", "))
+        if log { Log.write("Ventanas (incluidas/total por app): " + report.joined(separator: ", ")) }
         return result
     }
 

@@ -17,7 +17,7 @@ if args.count == 3, args[1] == "--snapshot" {
         }
         model.selection = (0, 3, 0, 5, 2)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1080, height: 660), styleMask: [.titled], backing: .buffered, defer: false)
-        let host = NSHostingView(rootView: MainView(model: model, store: store))
+        let host = NSHostingView(rootView: MainView(model: model, store: store, workspace: Workspace()))
         window.contentView = host
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))

@@ -12,6 +12,17 @@ Organizador de ventanas para macOS (14+), inspirado en Lasso. Es una app normal 
 2. Verás tus pantallas, cada una con su nombre, su fondo de escritorio y **su propia cuadrícula** (columnas × filas, ajustables encima de cada una y recordadas por monitor). La ventana actual aparece marcada con una línea discontinua.
 3. **Arrastra sobre la cuadrícula de la pantalla donde la quieras**: la ventana se mueve a ese monitor, ocupa esa zona y Lazo se oculta.
 
+## Guardar y restaurar el escritorio
+
+En la barra **Escritorio guardado** de la ventana de Lazo:
+
+- **Guardar escritorio** apunta dónde está cada ventana abierta (app, título y posición dentro de su monitor).
+- **Restaurar** (o **⌥⇧R** desde cualquier app) las vuelve a dejar igual. Las ventanas se emparejan por título y, si cambió, por orden dentro de cada app. Si falta un monitor, van a la pantalla principal con las mismas proporciones.
+- **Abrir las apps que falten**: abre las apps del escritorio guardado que no estén abiertas y coloca sus ventanas en cuanto aparecen.
+- **Restaurar al iniciar sesión**: al encender el Mac, Lazo se abre sola en segundo plano y deja el escritorio como lo guardaste.
+
+Solo se guardan las ventanas del escritorio actual que no estén minimizadas (macOS no permite manejar las de otros escritorios).
+
 ## Distribuciones
 
 En la barra lateral están las distribuciones guardadas (mitades, tercios, maximizar… y las tuyas):
@@ -33,6 +44,7 @@ En la barra lateral están las distribuciones guardadas (mitades, tercios, maxim
 | ⌃⌥C | Centrar |
 | ⌃⌥⌫ | Restaurar el tamaño anterior |
 | ⌃⌥⌘→ / ⌃⌥⌘← | Siguiente / anterior pantalla |
+| ⌥⇧R | Restaurar el escritorio guardado |
 | ⌃⌥ + arrastrar | Mover cualquier ventana desde cualquier punto (con ⇧, cambiar su tamaño) |
 
 Abajo se ajustan la separación entre ventanas y si los atajos colocan la ventana activa o la que está bajo el ratón. Al cerrar la ventana, Lazo sigue funcionando en segundo plano para que los atajos respondan.
