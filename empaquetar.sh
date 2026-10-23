@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 
 rm -rf dist
 mkdir -p dist
-for app in Captura Portapapeles Puntos Monitor Ventanas Volumen Historietas; do
+for app in Captura Portapapeles Puntos Monitor Ventanas Volumen Historietas Compresor Lazo; do
   echo "== $app"
   (cd "$app" && ./build.sh | tail -1)
   codesign --verify --strict "/Applications/$app.app"
