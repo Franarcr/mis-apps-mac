@@ -3,6 +3,8 @@
 Widget flotante para macOS (14+) que muestra en tiempo real (cada segundo) los recursos del Mac:
 
 - **CPU**, **memoria** y **GPU**, con la gráfica de los últimos 60 segundos
+- **Temperatura** del chip (el sensor más caliente) y el estado térmico de macOS. Si macOS empieza a frenar el procesador para enfriarse, se marca en rojo
+- **Consumo** total del Mac en vatios, según la batería (en Mac de sobremesa no aparece)
 - **Red**: bajada (↓ cian) y subida (↑ rosa)
 - **Disco**: lectura (L naranja), escritura (E amarillo) y espacio libre
 - **Batería**: porcentaje y estado de carga

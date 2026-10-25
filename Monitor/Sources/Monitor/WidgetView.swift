@@ -30,6 +30,17 @@ struct WidgetView: View {
                 MetricView(title: "GPU", value: Text(Format.percent(monitor.gpu.last)),
                            series: [monitor.gpu.values], colors: [.purple], maxValue: 1)
             }
+            if !monitor.temperature.values.isEmpty {
+                MetricView(title: "Temperatura",
+                           value: Text(String(format: "%.0f °C", monitor.temperature.last))
+                               + Text(" · \(monitor.thermalState)").foregroundColor(monitor.throttling ? .red : .secondary),
+                           series: [monitor.temperature.values], colors: [temperatureColor], maxValue: 100,
+                           footer: monitor.throttling ? "El Mac está bajando la velocidad para enfriarse" : nil)
+            }
+            if !monitor.power.values.isEmpty {
+                MetricView(title: "Consumo", value: Text(String(format: "%.1f W", monitor.power.last)),
+                           series: [monitor.power.values], colors: [.mint], minScale: 30)
+            }
             MetricView(title: "Red",
                        value: Text("↓ ").foregroundColor(.cyan) + Text(Format.rate(monitor.download.last))
                            + Text("  ↑ ").foregroundColor(.pink) + Text(Format.rate(monitor.upload.last)),
@@ -49,6 +60,11 @@ struct WidgetView: View {
         .background(background, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.1)))
         .environment(\.colorScheme, .dark)
+    }
+
+    /// Naranja normalmente; rojo a partir de 85 °C o si macOS está frenando el procesador.
+    private var temperatureColor: Color {
+        monitor.throttling || monitor.temperature.last >= 85 ? .red : .orange
     }
 
     private var background: AnyShapeStyle {
@@ -98,9 +114,11 @@ private struct MetricView: View {
     /// Escala fija (1 para porcentajes); si es `nil` se ajusta al máximo visible.
     var maxValue: Double?
     var footer: String?
+    /// Escala mínima cuando se ajusta sola (para que el ruido no llene la gráfica).
+    var minScale: Double = 1024
 
     private var scale: Double {
-        maxValue ?? max(series.flatMap { $0 }.max() ?? 0, 1024)
+        maxValue ?? max(series.flatMap { $0 }.max() ?? 0, minScale)
     }
 
     var body: some View {

@@ -21,6 +21,10 @@ final class SystemMonitor: ObservableObject {
     @Published private(set) var memoryUsed: UInt64 = 0
     @Published private(set) var gpu = Series()
     @Published private(set) var gpuAvailable = false
+    @Published private(set) var temperature = Series()
+    @Published private(set) var thermalState = ThermalStats.state
+    @Published private(set) var throttling = false
+    @Published private(set) var power = Series()
     @Published private(set) var download = Series()
     @Published private(set) var upload = Series()
     @Published private(set) var diskRead = Series()
@@ -61,6 +65,11 @@ final class SystemMonitor: ObservableObject {
             gpuAvailable = true
             gpu.push(value)
         }
+
+        if let value = ThermalStats.chipTemperature() { temperature.push(value) }
+        thermalState = ThermalStats.state
+        throttling = ThermalStats.isThrottling
+        if let watts = PowerStats.systemWatts() { power.push(watts) }
 
         if let totals = NetworkStats.totals(), let (down, up) = network.rates(a: totals.received, b: totals.sent) {
             download.push(down)
