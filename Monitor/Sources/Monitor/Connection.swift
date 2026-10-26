@@ -1,3 +1,4 @@
+import AppKit
 import CoreLocation
 import CoreWLAN
 import SystemConfiguration
@@ -16,7 +17,7 @@ struct ConnectionInfo: Equatable {
     var summary: String {
         switch kind {
         case .wifi:
-            let network = name.map { "Wi-Fi «\($0)»" } ?? "Wi-Fi"
+            let network = name.map { "Wi-Fi «\($0)»" } ?? "Wi-Fi (nombre oculto: falta permiso de Localización)"
             return ([network] + (detail.isEmpty ? [] : [detail])).joined(separator: " · ")
         case .ethernet: return "Por cable" + (detail.isEmpty ? "" : " · \(detail)")
         case .other: return detail.isEmpty ? "Otra conexión" : detail
@@ -45,7 +46,18 @@ final class ConnectionReader: NSObject, CLLocationManagerDelegate {
     /// Monitor no usa ni guarda la ubicación.
     func requestNetworkNameAccess() {
         if location.authorizationStatus == .notDetermined {
+            // Una app sin Dock tiene que estar activa para que macOS muestre la pregunta.
+            NSApp.activate(ignoringOtherApps: true)
             location.requestWhenInUseAuthorization()
+        }
+    }
+
+    /// Para el menú: pedir el permiso o, si ya se negó, abrir Ajustes en Localización.
+    func openNetworkNameSettings() {
+        if location.authorizationStatus == .notDetermined {
+            requestNetworkNameAccess()
+        } else {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")!)
         }
     }
 

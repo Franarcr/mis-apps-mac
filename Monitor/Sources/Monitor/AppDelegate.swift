@@ -133,6 +133,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Mantener encima de las ventanas", #selector(toggleOnTop), on: Preferences.alwaysOnTop))
         menu.addItem(item("Mostrar CPU en la barra de menú", #selector(toggleCPU), on: Preferences.cpuInMenuBar))
         menu.addItem(item("Abrir al iniciar sesión", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
+        if !monitor.connectionReader.canReadNetworkName {
+            menu.addItem(item("Mostrar el nombre de la red Wi-Fi…", #selector(enableNetworkName)))
+        }
         menu.addItem(.separator())
         menu.addItem(item("Abrir Monitor de Actividad", #selector(openActivityMonitor)))
         menu.addItem(.separator())
@@ -145,6 +148,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.state = on ? .on : .off
         return item
     }
+
+    @objc private func enableNetworkName() { monitor.connectionReader.openNetworkNameSettings() }
 
     @objc private func toggleWidget() {
         if panel.isVisible { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
