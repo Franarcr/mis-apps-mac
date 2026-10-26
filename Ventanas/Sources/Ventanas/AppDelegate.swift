@@ -25,6 +25,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// Al abrir Ventanas otra vez (desde Aplicaciones o Spotlight) se muestra su icono, por si
+    /// estaba oculto en la barra de menú, y su menú junto al ratón.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        statusItem.isVisible = true
+        if let menu = statusItem.menu {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
+        return false
+    }
+
     /// Las funciones arrancan solas en cuanto se concede el permiso de Accesibilidad.
     private func waitForPermission() {
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in

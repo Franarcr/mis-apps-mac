@@ -84,7 +84,7 @@ final class WindowButtons {
             Log.write("\(owner): Accesibilidad no responde en ese punto (error \(status.rawValue))")
             return nil
         }
-        let subrole: String? = element.value(kAXSubroleAttribute)
+        let subrole: String? = element.value(kAXSubroleAttribute) ?? customCloseButton(element)
         guard let subrole, let window: AXUIElement = element.value(kAXWindowAttribute) else {
             let role: String = element.value(kAXRoleAttribute) ?? "?"
             Log.write("\(owner): clic cerca de los botones, pero no en uno (rol \(role), subrol \(subrole ?? "?"))")
@@ -92,6 +92,19 @@ final class WindowButtons {
         }
         if subrole == "AXCloseButton" { Log.write("\(owner): botón rojo") }
         return (subrole, window)
+    }
+
+    /// Algunas apps (Folx, por ejemplo) dibujan sus propios botones de ventana, sin la marca
+    /// AXCloseButton. Si la ventana no tiene botón rojo estándar, el primer botón pequeño de la
+    /// esquina superior izquierda cuenta como el rojo.
+    private func customCloseButton(_ element: AXUIElement) -> String? {
+        guard element.value(kAXRoleAttribute) as String? == kAXButtonRole,
+              let window: AXUIElement = element.value(kAXWindowAttribute),
+              window.value(kAXCloseButtonAttribute) as AXUIElement? == nil,
+              let button = element.frame, let frame = window.frame,
+              button.width <= 24, button.height <= 24,
+              button.minX - frame.minX < 24, button.minY - frame.minY < 30 else { return nil }
+        return "AXCloseButton"
     }
 
     /// Si el clic cae en la esquina de los botones de una ventana, el nombre de su app.
