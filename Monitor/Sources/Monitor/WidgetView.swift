@@ -44,7 +44,8 @@ struct WidgetView: View {
             MetricView(title: "Red",
                        value: Text("↓ ").foregroundColor(.cyan) + Text(Format.rate(monitor.download.last))
                            + Text("  ↑ ").foregroundColor(.pink) + Text(Format.rate(monitor.upload.last)),
-                       series: [monitor.download.values, monitor.upload.values], colors: [.cyan, .pink])
+                       series: [monitor.download.values, monitor.upload.values], colors: [.cyan, .pink],
+                       footer: monitor.connection?.summary)
             MetricView(title: "Disco",
                        value: Text("L ").foregroundColor(.orange) + Text(Format.rate(monitor.diskRead.last))
                            + Text("  E ").foregroundColor(.yellow) + Text(Format.rate(monitor.diskWrite.last)),

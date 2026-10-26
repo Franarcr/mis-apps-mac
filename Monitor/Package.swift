@@ -8,7 +8,7 @@ let package = Package(
         .executableTarget(
             name: "Monitor",
             path: "Sources/Monitor",
-            linkerSettings: [.linkedFramework("IOKit")]
+            linkerSettings: [.linkedFramework("IOKit"), .linkedFramework("CoreWLAN"), .linkedFramework("CoreLocation"), .linkedFramework("SystemConfiguration")]
         )
     ],
     swiftLanguageModes: [.v5]

@@ -90,6 +90,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         updateStatusItem()
 
+        // El nombre de la red Wi-Fi requiere permiso de ubicación.
+        monitor.connectionReader.onAuthorizationChange = { [weak self] in self?.monitor.refreshConnection() }
+        monitor.connectionReader.requestNetworkNameAccess()
+
         monitor.onTick = { [weak self] in self?.updateStatusItem() }
         monitor.start()
     }
