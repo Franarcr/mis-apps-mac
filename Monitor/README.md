@@ -3,7 +3,10 @@
 Widget flotante para macOS (14+) que muestra en tiempo real (cada segundo) los recursos del Mac:
 
 - **CPU**, **memoria** y **GPU**, con la gráfica de los últimos 60 segundos
-- **Red**: bajada (↓ cian) y subida (↑ rosa)
+- **Temperatura** del chip (el sensor más caliente) y el estado térmico de macOS. Si macOS empieza a frenar el procesador para enfriarse, se marca en rojo
+- **Consumo** total del Mac en vatios, según la batería (en Mac de sobremesa no aparece)
+- **Red**: bajada (↓ cian) y subida (↑ rosa), y debajo la conexión: nombre de la red Wi-Fi, banda (2,4, 5 o 6 GHz), estándar (Wi-Fi 4 a 7) y calidad de la señal, o «Por cable»
+- La primera vez pide permiso de **ubicación**: macOS solo deja ver el nombre de la red Wi-Fi a las apps que lo tienen. Monitor no usa ni guarda la ubicación
 - **Disco**: lectura (L naranja), escritura (E amarillo) y espacio libre
 - **Batería**: porcentaje y estado de carga
 - Los **3 procesos que más CPU usan**

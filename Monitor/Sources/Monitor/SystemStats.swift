@@ -190,3 +190,87 @@ private func forEachService(_ className: String, _ body: (io_object_t) -> Void) 
 private func property(_ service: io_object_t, _ key: String) -> Any? {
     IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
 }
+
+// MARK: - Temperatura y consumo
+
+/// Temperatura del chip (°C): la más alta de los sensores del procesador ("PMU tdie…").
+/// macOS no tiene una API pública para esto; se usan las funciones de IOHIDEventSystem que
+/// también usan otras apps de monitorización. No necesita permisos.
+enum ThermalStats {
+    private typealias Create = @convention(c) (CFAllocator?) -> Unmanaged<AnyObject>?
+    private typealias SetMatching = @convention(c) (AnyObject, CFDictionary) -> Int32
+    private typealias CopyServices = @convention(c) (AnyObject) -> Unmanaged<CFArray>?
+    private typealias CopyEvent = @convention(c) (AnyObject, Int64, Int32, Int64) -> Unmanaged<AnyObject>?
+    private typealias GetFloat = @convention(c) (AnyObject, Int32) -> Double
+    private typealias CopyProperty = @convention(c) (AnyObject, CFString) -> Unmanaged<AnyObject>?
+
+    private static let temperatureEvent: Int64 = 15
+
+    private struct API {
+        /// El cliente tiene que seguir vivo mientras se leen sus sensores.
+        let client: AnyObject
+        let copyEvent: CopyEvent
+        let getFloat: GetFloat
+        /// Sensores del chip, buscados una sola vez.
+        let sensors: [AnyObject]
+    }
+
+    private static let api: API? = {
+        guard let handle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW),
+              let create = dlsym(handle, "IOHIDEventSystemClientCreate"),
+              let setMatching = dlsym(handle, "IOHIDEventSystemClientSetMatching"),
+              let copyServices = dlsym(handle, "IOHIDEventSystemClientCopyServices"),
+              let copyEvent = dlsym(handle, "IOHIDServiceClientCopyEvent"),
+              let getFloat = dlsym(handle, "IOHIDEventGetFloatValue"),
+              let copyProperty = dlsym(handle, "IOHIDServiceClientCopyProperty"),
+              let client = unsafeBitCast(create, to: Create.self)(kCFAllocatorDefault)?.takeRetainedValue() else { return nil }
+        _ = unsafeBitCast(setMatching, to: SetMatching.self)(client, ["PrimaryUsagePage": 0xff00, "PrimaryUsage": 5] as CFDictionary)
+        let services = unsafeBitCast(copyServices, to: CopyServices.self)(client)?.takeRetainedValue() as? [AnyObject] ?? []
+        let product = unsafeBitCast(copyProperty, to: CopyProperty.self)
+        // En Apple Silicon los sensores del chip se llaman "PMU tdie1", "PMU2 tdie3"…
+        var sensors = services.filter { service in
+            (product(service, "Product" as CFString)?.takeRetainedValue() as? String)?.contains("tdie") == true
+        }
+        if sensors.isEmpty { sensors = services }   // otros modelos: el máximo de todos
+        return API(client: client, copyEvent: unsafeBitCast(copyEvent, to: CopyEvent.self),
+                   getFloat: unsafeBitCast(getFloat, to: GetFloat.self), sensors: sensors)
+    }()
+
+    static func chipTemperature() -> Double? {
+        guard let api else { return nil }
+        var hottest: Double?
+        for sensor in api.sensors {
+            guard let event = api.copyEvent(sensor, temperatureEvent, 0, 0)?.takeRetainedValue() else { continue }
+            let value = api.getFloat(event, Int32(temperatureEvent << 16))
+            if value > 0, value < 130 { hottest = max(hottest ?? 0, value) }
+        }
+        return hottest
+    }
+
+    /// Estado térmico que publica macOS: a partir de "Alto" baja la velocidad del procesador para enfriarse.
+    static var state: String {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: return "Normal"
+        case .fair: return "Templado"
+        case .serious: return "Alto"
+        case .critical: return "Crítico"
+        @unknown default: return ""
+        }
+    }
+
+    static var isThrottling: Bool { ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue }
+}
+
+enum PowerStats {
+    /// Consumo total del Mac en vatios, según la batería (en Mac de sobremesa no está disponible).
+    static func systemWatts() -> Double? {
+        var watts: Double?
+        forEachService("AppleSmartBattery") { service in
+            if let telemetry = property(service, "PowerTelemetryData") as? [String: Any],
+               let load = (telemetry["SystemLoad"] as? NSNumber)?.doubleValue, load > 0, load < 1_000_000 {
+                watts = load / 1000
+            }
+        }
+        return watts
+    }
+}

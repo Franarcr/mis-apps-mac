@@ -21,6 +21,11 @@ final class SystemMonitor: ObservableObject {
     @Published private(set) var memoryUsed: UInt64 = 0
     @Published private(set) var gpu = Series()
     @Published private(set) var gpuAvailable = false
+    @Published private(set) var temperature = Series()
+    @Published private(set) var thermalState = ThermalStats.state
+    @Published private(set) var throttling = false
+    @Published private(set) var power = Series()
+    @Published private(set) var connection: ConnectionInfo?
     @Published private(set) var download = Series()
     @Published private(set) var upload = Series()
     @Published private(set) var diskRead = Series()
@@ -34,6 +39,7 @@ final class SystemMonitor: ObservableObject {
     /// Se llama tras cada muestra (para actualizar la barra de menú).
     var onTick: (() -> Void)?
 
+    let connectionReader = ConnectionReader()
     private let cpuSampler = CPUSampler()
     private var network = RateCounter()
     private var disk = RateCounter()
@@ -62,6 +68,11 @@ final class SystemMonitor: ObservableObject {
             gpu.push(value)
         }
 
+        if let value = ThermalStats.chipTemperature() { temperature.push(value) }
+        thermalState = ThermalStats.state
+        throttling = ThermalStats.isThrottling
+        if let watts = PowerStats.systemWatts() { power.push(watts) }
+
         if let totals = NetworkStats.totals(), let (down, up) = network.rates(a: totals.received, b: totals.sent) {
             download.push(down)
             upload.push(up)
@@ -76,9 +87,14 @@ final class SystemMonitor: ObservableObject {
         // Lo que cambia despacio se lee con menos frecuencia.
         if ticks % 30 == 0 { diskSpace = DiskStats.space() }
         if ticks % 10 == 0 { battery = BatteryStats.read() }
+        if ticks % 5 == 0 { refreshConnection() }
         if ticks % 3 == 0 { refreshProcesses() }
         ticks += 1
         onTick?()
+    }
+
+    func refreshConnection() {
+        connection = connectionReader.read()
     }
 
     private func refreshProcesses() {

@@ -20,6 +20,10 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
+    <key>NSLocationUsageDescription</key>
+    <string>macOS solo permite ver el nombre de la red Wi-Fi a las apps con acceso a la ubicación. Monitor no usa ni guarda tu ubicación.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>macOS solo permite ver el nombre de la red Wi-Fi a las apps con acceso a la ubicación. Monitor no usa ni guarda tu ubicación.</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>
