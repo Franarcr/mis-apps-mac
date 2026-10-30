@@ -271,7 +271,8 @@ final class EditorModel: ObservableObject {
     private func computeSkyMask() {
         guard segmentInstalled else { return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: photo.preview.extent, connectedToTop: true)
+            let mask = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: photo.preview.extent,
+                                         connectedToTop: true, guide: photo.preview)
             DispatchQueue.main.async {
                 guard self.photo === photo else { return }
                 self.skyMask = mask

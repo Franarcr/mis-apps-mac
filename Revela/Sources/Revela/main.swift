@@ -51,6 +51,16 @@ if arguments.contains("--profundidad") {
     exit(0)
 }
 
+if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
+    // Exporta una foto con sus ajustes guardados en Revela (sin cambiarlos): Revela --revelar foto salida.jpg
+    let url = URL(fileURLWithPath: arguments[i + 1])
+    guard let photo = try? Photo(url: url), let a = EditStore.load(for: url) else { print("Sin ajustes guardados"); exit(1) }
+    let start = Date()
+    try? Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[i + 2]), format: .jpeg, quality: 0.92, context: CIContext())
+    print(String(format: "Revelada en %.1f s", Date().timeIntervalSince(start)))
+    exit(0)
+}
+
 if arguments.contains("--ampliar") {
     // Descarga Real-ESRGAN si falta y muestra sus entradas y salidas.
     if !UpscaleModel.isInstalled {

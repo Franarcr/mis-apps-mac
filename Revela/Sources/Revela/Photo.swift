@@ -117,7 +117,8 @@ enum Exporter {
                 selection = SegmentModel.mask(embedding, points: adjustments.selection, extent: full.extent)
             }
             if adjustments.usesSky {
-                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true)
+                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true,
+                                        guide: full)
             }
         }
         var output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,

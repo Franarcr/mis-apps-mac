@@ -57,7 +57,10 @@ extension SegmentModel {
 
     /// Máscara (blanco = seleccionado) del tamaño `extent` para los clics dados.
     /// `connectedToTop`: para el cielo, solo cuenta lo que está unido al borde de arriba (quita reflejos sueltos).
-    static func mask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect, connectedToTop: Bool = false) -> CIImage? {
+    /// `guide`: la foto; para el cielo, el borde de la máscara se ajusta al color de la foto
+    /// (la máscara de SAM es de 256 × 256 y, estirada a la foto completa, queda gruesa).
+    static func mask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect, connectedToTop: Bool = false,
+                     guide: CIImage? = nil) -> CIImage? {
         guard !points.isEmpty, let promptModel = try? prompt.load(), let decoderModel = try? decoder.load(),
               let coords = try? MLMultiArray(shape: [1, NSNumber(value: points.count), 2], dataType: .float32),
               let labels = try? MLMultiArray(shape: [1, NSNumber(value: points.count)], dataType: .float32) else { return nil }
@@ -92,7 +95,7 @@ extension SegmentModel {
         let data = Data(bytes: values, count: values.count * 4)
         let small = CIImage(bitmapData: data, bytesPerRow: width * 4, size: CGSize(width: width, height: height),
                             format: .Rf, colorSpace: nil) // la fila 0 de los datos es la de arriba, como en SAM
-        return small
+        let coarse = small
             .transformed(by: CGAffineTransform(scaleX: extent.width / CGFloat(width), y: extent.height / CGFloat(height)))
             .transformed(by: CGAffineTransform(translationX: extent.minX, y: extent.minY))
             .applyingFilter("CIColorMatrix", parameters: [
@@ -100,6 +103,8 @@ extension SegmentModel {
                 "inputBVector": CIVector(x: 1, y: 0, z: 0, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
             ])
             .cropped(to: extent)
+        guard let guide else { return coarse }
+        return SkyRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: extent.width / CGFloat(width))
     }
 
     /// Deja solo las zonas unidas a la fila de arriba (y su borde suave); el resto, a cero.
@@ -139,4 +144,54 @@ extension SegmentModel {
     /// El cielo: clics en la franja de arriba. Se descarta si lo que sale no toca el borde superior
     /// o es demasiado pequeño (en esa foto probablemente no hay cielo).
     static let skyPoints = [SelectionPoint(x: 0.5, y: 0.97), SelectionPoint(x: 0.15, y: 0.95), SelectionPoint(x: 0.85, y: 0.95)]
+}
+
+/// Ajusta el borde de la máscara del cielo a la foto. La máscara de SAM (256 × 256) estirada a la foto
+/// completa deja una franja del cielo original alrededor de edificios y árboles. En esa franja se decide
+/// píxel a píxel por el color: es cielo si se parece al color del cielo de esa zona.
+enum SkyRefiner {
+    static func refine(_ coarse: CIImage, photo: CIImage, cell: CGFloat) -> CIImage {
+        let extent = coarse.extent
+        func clamp01(_ x: CIImage) -> CIImage { x.applyingFilter("CIColorClamp").cropped(to: extent) }
+        func affine(_ x: CIImage, _ k: CGFloat, _ bias: CGFloat) -> CIImage {
+            clamp01(x.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: k, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: k, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 0),
+            ]))
+        }
+        // Cielo seguro: el interior de la máscara, alejado más de una celda del borde.
+        let core = affine(coarse.clampedToExtent()
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: cell * 1.5]).cropped(to: extent), 10, -8.5)
+        // Franja dudosa: hasta dos celdas por fuera de la máscara.
+        let band = affine(coarse.clampedToExtent()
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: cell * 2]).cropped(to: extent), 4, -1)
+        // Color del cielo en cada zona: media del cielo seguro de alrededor (convolución normalizada).
+        let sigma = Double(cell * 3)
+        let weighted = photo.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: core])
+        let num = weighted.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+        let den = core.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+            .applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.001, y: 0.001, z: 0.001, w: 1)])
+        let skyColor = den.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: num])
+        // Parecido de cada píxel al color del cielo de su zona (diferencia media de los tres canales).
+        let difference = photo.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: skyColor])
+        let third = CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0)
+        // Se suaviza un poco para que el ruido de la foto no deje puntos sueltos.
+        let noise = Double(max(1.5, extent.width / 2500))
+        let distance = difference.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": third, "inputGVector": third, "inputBVector": third, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ]).clampedToExtent().applyingGaussianBlur(sigma: noise).cropped(to: extent)
+        // Hasta 0,03 de diferencia es cielo; a partir de 0,09, no (más estricto deja puntos del cielo viejo).
+        let similar = affine(distance, -1 / 0.06, 0.09 / 0.06)
+        let fine = similar.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: band]).cropped(to: extent)
+        // El cielo seguro se queda siempre (por si tiene nubes de otro color); en la franja manda el color.
+        let merged = clamp01(fine.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: core]))
+        // Puntos aislados fuera: un cierre (máximo y luego mínimo) los rellena o los quita, y un borde de 1 px suave.
+        let r = noise
+        return merged.clampedToExtent()
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: r])
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: r])
+            .applyingGaussianBlur(sigma: 0.8)
+            .cropped(to: extent)
+    }
 }

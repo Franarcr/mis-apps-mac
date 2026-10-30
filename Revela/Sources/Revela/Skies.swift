@@ -40,9 +40,8 @@ enum Skies {
             sky = v.outputImage ?? sky
         }
         if a.skyLight != 0 { sky = Develop.exposure(sky, ev: a.skyLight / 100 * 1.2) }
-        // El borde se difumina un poco para que el cielo nuevo se funda con el horizonte.
-        let soft = mask.clampedToExtent().applyingGaussianBlur(sigma: max(1, image.extent.width / 1500)).cropped(to: image.extent)
-        return Develop.blend(sky, over: image, mask: soft)
+        // La máscara ya llega ajustada a los bordes de la foto (MaskRefiner): no se difumina más.
+        return Develop.blend(sky, over: image, mask: mask)
     }
 
     private static var fileCache: [String: CIImage] = [:]
