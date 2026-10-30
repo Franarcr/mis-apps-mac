@@ -64,9 +64,61 @@ enum Skies {
             sky = v.outputImage ?? sky
         }
         if a.skyLight != 0 { sky = Develop.exposure(sky, ev: a.skyLight / 100 * 1.2) }
-        let ground = a.skyHarmonize > 0 ? harmonize(image, newSky: sky, mask: mask, amount: a.skyHarmonize / 100) : image
-        // La máscara ya llega ajustada a los bordes de la foto (EdgeRefiner): no se difumina más.
-        return Develop.blend(sky, over: ground, mask: mask)
+        var ground = a.skyHarmonize > 0 ? harmonize(image, newSky: sky, mask: mask, amount: a.skyHarmonize / 100) : image
+        if a.skyHaze > 0 {
+            ground = horizonHaze(ground, newSky: sky, mask: mask, horizon: horizon(of: mask, in: image.extent), amount: a.skyHaze / 100)
+        }
+        // El cielo entra unos píxeles en los objetos: el borde claro que deja la mezcla de hoja y cielo viejo
+        // queda cubierto (y el cielo viejo de ese borde se resta al componer).
+        let grow = max(1, image.extent.width / 700)
+        let grown = mask.clampedToExtent().applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: grow])
+            .applyingGaussianBlur(sigma: Double(grow) * 0.25).cropped(to: image.extent)
+        return composite(sky, over: ground, original: image, mask: grown)
+    }
+
+    /// «Bruma del horizonte»: lo lejano, junto al horizonte, toma el color del cielo nuevo cerca del horizonte
+    /// (perspectiva atmosférica). Así los edificios y árboles lejanos no quedan con el gris del cielo viejo.
+    static func horizonHaze(_ image: CIImage, newSky: CIImage, mask: CIImage, horizon: CGFloat, amount: Double) -> CIImage {
+        let extent = image.extent
+        // Color del cielo nuevo en la franja justo encima del horizonte.
+        let band = CGRect(x: extent.minX, y: horizon, width: extent.width, height: extent.height * 0.08).intersection(extent)
+        guard band.height > 1 else { return image }
+        let color = newSky.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: band)])
+            .clampedToExtent().cropped(to: extent)
+        // Más bruma en el horizonte y nada a un 15 % de la altura por debajo.
+        let f = CIFilter.linearGradient()
+        f.point0 = CGPoint(x: 0, y: horizon)
+        f.point1 = CGPoint(x: 0, y: horizon - extent.height * 0.15)
+        let k = CGFloat(amount)
+        f.color0 = CIColor(red: k, green: k, blue: k)
+        f.color1 = CIColor(red: 0, green: 0, blue: 0)
+        let fade = f.outputImage!.cropped(to: extent)
+        // Como la bruma real: lo lejano se mezcla con el color del aire, sin perder del todo sus formas.
+        let mixed = Develop.mix(image, color, amount: 0.75)
+        return Develop.blend(mixed, over: image, mask: fade)
+    }
+
+    /// Pone el cielo nuevo quitando el viejo de los bordes: un píxel de borde con una proporción `m` de cielo
+    /// es m·cielo viejo + (1 − m)·hoja; se le resta el cielo viejo de su zona y se suma el nuevo:
+    /// resultado = foto + m·(cielo nuevo − cielo viejo). Así no queda contorno gris. En el cielo seguro
+    /// se pone el cielo nuevo tal cual (si no, las nubes viejas se notarían por debajo).
+    private static func composite(_ newSky: CIImage, over ground: CIImage, original: CIImage, mask: CIImage) -> CIImage {
+        let extent = original.extent
+        // Local (unos 20 px en una foto de 6000): el cielo cambia mucho cerca del horizonte.
+        let sigma = Double(extent.width / 300)
+        let core = mask.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 10, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 10, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 10, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBiasVector": CIVector(x: -9, y: -9, z: -9, w: 0),
+        ]).applyingFilter("CIColorClamp").cropped(to: extent)
+        // Cielo viejo de cada zona: media del cielo seguro de alrededor.
+        let num = Arith.mul(original, core).clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+        let den = core.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+            .applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.001, y: 0.001, z: 0.001, w: 1)])
+        let oldSky = den.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: num])
+        let edge = Arith.add(ground, Arith.mul(mask, Arith.sub(newSky, oldSky)))
+            .applyingFilter("CIColorClamp").cropped(to: extent)
+        return Develop.blend(newSky, over: edge, mask: core)
     }
 
     /// «Armonizar con el cielo»: el resto de la foto toma algo del color y de la luz del cielo nuevo,

@@ -327,6 +327,10 @@ struct EditorView: View {
             }
             Button("Añadir fotos de cielo…") { model.chooseSkyPhoto() }
             if model.adjustments.skyReplacement != nil { slider("Intensidad del cielo", \.skyAmount, 0...100) }
+            if model.adjustments.skyReplacement != nil {
+                slider("Bruma del horizonte", \.skyHaze, 0...100)
+                    .help("Lo lejano toma el color del cielo nuevo junto al horizonte, para que se funda con él")
+            }
             slider("Armonizar con el cielo", \.skyHarmonize, 0...100)
                 .help("El paisaje toma algo del color y la luz del cielo, como si lo iluminara")
         } else {

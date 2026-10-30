@@ -12,6 +12,8 @@ final class EditorModel: ObservableObject {
             // Al elegir otro cielo, se ve entero (si no, se quedaba con la intensidad del anterior).
             if adjustments.skyReplacement != oldValue.skyReplacement, adjustments.skyReplacement != nil, !restoring {
                 adjustments.skyAmount = 100
+                // Un cielo nuevo necesita algo de bruma en el horizonte para fundirse con lo lejano.
+                if oldValue.skyReplacement == nil, adjustments.skyHaze == 0 { adjustments.skyHaze = 30 }
             }
             recordUndo(oldValue)
             if adjustments.usesSubjectMask, mask == nil { computeMask() }

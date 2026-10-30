@@ -172,7 +172,7 @@ enum EdgeRefiner {
     /// `similar`…`different`: diferencia media de color hasta la que es la misma superficie, y desde la que ya no.
     static func refine(_ coarse: CIImage, photo: CIImage, cell: CGFloat,
                        similar near: CGFloat = 0.03, different far: CGFloat = 0.09, reach: CGFloat = 6,
-                       greenWeight: CGFloat = 1.0 / 3, rejectGreener: Bool = false) -> CIImage {
+                       greenWeight: CGFloat = 1.0 / 3, rejectGreener: Bool = false, unmix: Bool = false) -> CIImage {
         let extent = coarse.extent
         func clamp01(_ x: CIImage) -> CIImage { x.applyingFilter("CIColorClamp").cropped(to: extent) }
         func affine(_ x: CIImage, _ k: CGFloat, _ bias: CGFloat) -> CIImage {
@@ -208,7 +208,27 @@ enum EdgeRefiner {
         ]).clampedToExtent().applyingGaussianBlur(sigma: noise).cropped(to: extent)
         // Para el cielo, hasta 0,03 de diferencia es cielo y desde 0,09 no (más estricto deja puntos del cielo viejo).
         let similar = affine(distance, -1 / (far - near), far / (far - near))
-        var fine = similar.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: band]).cropped(to: extent)
+        var amount = similar
+        if unmix {
+            // En el borde, cada píxel es una mezcla de cielo y de lo que tiene delante (hojas, la bruma de un
+            // edificio lejano). La proporción de cielo sale de proyectar el píxel entre el color del cielo de
+            // la zona (S) y el del suelo de la zona (F): alfa = (I − F)·(S − F) / |S − F|².
+            let groundWeight = affine(band, -1, 1)
+            let groundNum = photo.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: groundWeight])
+                .clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+            let groundDen = groundWeight.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+                .applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.001, y: 0.001, z: 0.001, w: 1)])
+            let groundColor = groundDen.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: groundNum])
+            let e = Arith.sub(skyColor, groundColor), d = Arith.sub(photo, groundColor)
+            let dot = Arith.sum(Arith.mul(d, e)), norm = Arith.sum(Arith.mul(e, e))
+            let normSafe = norm.applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.0001, y: 0.0001, z: 0.0001, w: 1)])
+            let unmixed = clamp01(normSafe.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: dot]))
+                .clampedToExtent().applyingGaussianBlur(sigma: noise).cropped(to: extent)
+            // Si cielo y suelo tienen casi el mismo color la proyección no es fiable: ahí manda el parecido.
+            let confidence = affine(norm, 1 / 0.004, 0)
+            amount = Develop.blend(unmixed, over: similar, mask: confidence)
+        }
+        var fine = amount.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: band]).cropped(to: extent)
         if rejectGreener {
             // Las plantas en sombra pueden ser tan oscuras como el agua: lo que es más verde que el agua
             // de su zona (verde − media de rojo y azul) no es agua.
@@ -227,6 +247,8 @@ enum EdgeRefiner {
         }
         // El cielo seguro se queda siempre (por si tiene nubes de otro color); en la franja manda el color.
         let merged = clamp01(fine.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: core]))
+        // Con la proporción de cielo calculada, el borde ya es suave y fiel: no se limpia más.
+        if unmix { return merged }
         // Puntos aislados fuera: un cierre (máximo y luego mínimo) los rellena o los quita, y un borde de 1 px suave.
         let r = noise
         return merged.clampedToExtent()
@@ -234,5 +256,33 @@ enum EdgeRefiner {
             .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: r])
             .applyingGaussianBlur(sigma: 0.8)
             .cropped(to: extent)
+    }
+}
+
+/// Operaciones aritméticas por píxel con signo (Core Image trabaja en coma flotante).
+enum Arith {
+    static func sub(_ a: CIImage, _ b: CIImage) -> CIImage {
+        let negated = b.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: -1, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: -1, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: -1, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        ])
+        return negated.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: a]).cropped(to: a.extent)
+    }
+
+    static func mul(_ a: CIImage, _ b: CIImage) -> CIImage {
+        a.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: b]).cropped(to: a.extent)
+    }
+
+    /// r + g + b en los tres canales.
+    static func sum(_ a: CIImage) -> CIImage {
+        let ones = CIVector(x: 1, y: 1, z: 1, w: 0)
+        return a.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": ones, "inputGVector": ones, "inputBVector": ones, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ])
+    }
+
+    static func add(_ a: CIImage, _ b: CIImage) -> CIImage {
+        let opaqueB = b.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0)])
+        return opaqueB.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: a]).cropped(to: a.extent)
     }
 }
