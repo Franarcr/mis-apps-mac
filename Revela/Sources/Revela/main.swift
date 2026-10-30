@@ -57,6 +57,22 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
     // Exporta una foto con sus ajustes guardados en Revela (sin cambiarlos): Revela --revelar foto salida.jpg
     let url = URL(fileURLWithPath: arguments[i + 1])
     guard let photo = try? Photo(url: url), var a = EditStore.load(for: url) else { print("Sin ajustes guardados"); exit(1) }
+    // --quitar a,b,…: prueba sin algunos ajustes (agua, look, auto, realce, luz) para aislar un problema.
+    if let q = arguments.firstIndex(of: "--quitar"), arguments.count > q + 1 {
+        for name in arguments[q + 1].split(separator: ",") {
+            switch name {
+            case "agua": a.water = []
+            case "look": a.look = nil
+            case "auto": a.autoEnhance = false
+            case "realce": a.skyEnhance = 0
+            case "luz": a.skyLight = 0
+            case "intensidad": a.skyAmount = 100
+            case "borrado": a.erase = []
+            default: break
+            }
+        }
+    }
+    if let h = arguments.firstIndex(of: "--bruma"), arguments.count > h + 1 { a.skyHaze = Double(arguments[h + 1]) ?? 0 }
     // --agua x,y tono reflejo luz: prueba los ajustes de agua sin guardarlos.
     if let w = arguments.firstIndex(of: "--agua"), arguments.count > w + 4 {
         let v = arguments[w + 1].split(separator: ",").compactMap { Double($0) }
@@ -66,9 +82,24 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
         a.waterLight = Double(arguments[w + 4]) ?? 0
     }
     let start = Date()
-    try? Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[i + 2]), format: .jpeg, quality: 0.92,
-                         usePreview: arguments.contains("--previa"), context: CIContext())
+    do { try Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[i + 2]), format: .jpeg, quality: 0.92,
+                         usePreview: arguments.contains("--previa"), context: CIContext()) } catch { print("Error: \(error)") }
     print(String(format: "Revelada en %.1f s", Date().timeIntervalSince(start)))
+    exit(0)
+}
+
+if let i = arguments.firstIndex(of: "--mascara-cielo"), arguments.count > i + 2 {
+    // Guarda la máscara del cielo (a tamaño de vista previa o completa con --completa) para revisarla.
+    let photo = try! Photo(url: URL(fileURLWithPath: arguments[i + 1]))
+    let image = arguments.contains("--completa") ? photo.fullImage()! : photo.preview
+    let context = CIContext()
+    let embedding = SegmentModel.encode(image, context: context)!
+    let coarse = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: image.extent, connectedToTop: true)!
+    let fine = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: image.extent, connectedToTop: true, guide: image)!
+    for (name, m) in [("gruesa", coarse), ("fina", fine)] {
+        try? context.writePNGRepresentation(of: m, to: URL(fileURLWithPath: arguments[i + 2] + "-\(name).png"), format: .RGBA8,
+                                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
     exit(0)
 }
 

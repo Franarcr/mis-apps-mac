@@ -138,7 +138,9 @@ enum Develop {
         }
 
         // Agua: después del cielo, para tomar su color (el cambiado, si se cambió).
-        if let water, a.waterTint > 0 || a.waterReflection > 0 || a.waterLight != 0 {
+        if var water, a.waterTint > 0 || a.waterReflection > 0 || a.waterLight != 0 {
+            // El agua nunca es cielo: si un clic del agua cayó en el cielo, el cielo no se toca.
+            if let sky { water = Arith.mul(water, sky.applyingFilter("CIColorInvert")).applyingFilter("CIColorClamp") }
             img = Water.apply(a, to: img, water: water, sky: sky)
         }
 

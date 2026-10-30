@@ -202,7 +202,8 @@ enum EdgeRefiner {
         let side = (1 - greenWeight) / 2
         let third = CIVector(x: side, y: greenWeight, z: side, w: 0)
         // Se suaviza un poco para que el ruido de la foto no deje puntos sueltos.
-        let noise = Double(max(1.5, extent.width / 2500))
+        // Proporcional al tamaño: en la vista previa (2048 px) un radio fijo taparía los huecos de rejillas y ramas.
+        let noise = Double(max(0.5, extent.width / 4000))
         let distance = difference.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": third, "inputGVector": third, "inputBVector": third, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
         ]).clampedToExtent().applyingGaussianBlur(sigma: noise).cropped(to: extent)
