@@ -136,8 +136,14 @@ extension SegmentModel {
         let tight = EdgeRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: cell, reach: 1.5)
         // Y el borde se difumina hacia fuera: con niebla, lo lejano se funde con el cielo (las copas de los
         // árboles no quedan recortadas con la forma gruesa de la máscara de SAM).
-        let soft = tight.clampedToExtent().applyingGaussianBlur(sigma: Double(cell)).cropped(to: extent)
-            .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: tight]).cropped(to: extent)
+        let spread = tight.clampedToExtent().applyingGaussianBlur(sigma: Double(cell)).cropped(to: extent)
+        // Pero lo que en esa franja tiene el color del cielo viejo (niebla casi blanca pegada al cielo) es cielo
+        // del todo: a medias quedaría un ribete pálido entre el cielo nuevo y la niebla.
+        let photo = guide.cropped(to: extent)
+        let rim = Arith.mul(scaled(spread, 3, 0), similarToSky(photo, sky: tight, near: 0.06, far: 0.12))
+        let soft = spread
+            .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: tight])
+            .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: rim]).cropped(to: extent)
         let horizon = Skies.horizon(of: coarse, in: extent)
         let f = CIFilter.linearGradient()
         f.point0 = CGPoint(x: 0, y: horizon + extent.height * 0.08)
@@ -150,10 +156,39 @@ extension SegmentModel {
         ]).cropped(to: extent)
     }
 
+    private static let averageContext = CIContext(options: [.cacheIntermediates: false])
+
+    /// k·x + bias, recortado a 0…1.
+    private static func scaled(_ x: CIImage, _ k: CGFloat, _ bias: CGFloat) -> CIImage {
+        x.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: k, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: k, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 0),
+        ]).applyingFilter("CIColorClamp").cropped(to: x.extent)
+    }
+
+    /// 1 donde la foto tiene el color del cielo de su zona (diferencia media ≤ `near`), 0 desde `far`.
+    private static func similarToSky(_ photo: CIImage, sky: CIImage, near: CGFloat, far: CGFloat) -> CIImage {
+        let extent = photo.extent
+        let small = CGAffineTransform(scaleX: 1.0 / 8, y: 1.0 / 8)
+        let core = scaled(sky, 10, -9)
+        let sigma = Double(extent.width / 60 / 8)
+        let num = Arith.mul(photo, core).transformed(by: small).clampedToExtent().applyingGaussianBlur(sigma: sigma)
+        let den = core.transformed(by: small).clampedToExtent().applyingGaussianBlur(sigma: sigma)
+            .applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.001, y: 0.001, z: 0.001, w: 1)])
+        let local = den.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: num])
+            .transformed(by: small.inverted()).cropped(to: extent)
+        let third = CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0)
+        let distance = photo.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: local])
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": third, "inputGVector": third, "inputBVector": third, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ]).cropped(to: extent)
+        return scaled(distance, -1 / (far - near), far / (far - near))
+    }
+
     /// El cielo que asoma entre las hojas de un árbol grande: SAM toma el árbol entero y el ajuste del borde
     /// solo llega a unos 100 px. Por encima del horizonte, cerca del cielo y donde hay mucho detalle (follaje),
     /// lo que tiene el color del cielo de la zona es cielo. Las zonas lisas (fachadas, niebla, ropa) no entran.
-    private static let averageContext = CIContext(options: [.cacheIntermediates: false])
 
     /// Valor de una máscara en un punto (x, y de 0 a 1, origen abajo a la izquierda).
     static func value(of mask: CIImage, at point: SelectionPoint) -> Float {
