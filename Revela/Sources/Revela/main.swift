@@ -64,7 +64,8 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
         a.waterLight = Double(arguments[w + 4]) ?? 0
     }
     let start = Date()
-    try? Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[i + 2]), format: .jpeg, quality: 0.92, context: CIContext())
+    try? Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[i + 2]), format: .jpeg, quality: 0.92,
+                         usePreview: arguments.contains("--previa"), context: CIContext())
     print(String(format: "Revelada en %.1f s", Date().timeIntervalSince(start)))
     exit(0)
 }
@@ -161,12 +162,13 @@ if arguments.contains("--seleccion") {
         var start = Date()
         guard let embedding = SegmentModel.encode(photo.preview, context: context) else { print("No se pudo codificar"); exit(1) }
         print(String(format: "Codificada en %.2f s", Date().timeIntervalSince(start)))
+        // x,y para sumar; x,y,0 para quitar esa zona.
         let points = arguments[(index + 3)...].map { arg -> SelectionPoint in
             let v = arg.split(separator: ",").compactMap { Double($0) }
-            return SelectionPoint(x: v[0], y: v[1])
+            return SelectionPoint(x: v[0], y: v[1], include: v.count < 3 || v[2] != 0)
         }
         start = Date()
-        guard let mask = SegmentModel.mask(embedding, points: points, extent: photo.preview.extent) else { print("Sin máscara"); exit(1) }
+        guard let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent) else { print("Sin máscara"); exit(1) }
         print(String(format: "Máscara en %.2f s", Date().timeIntervalSince(start)))
         // Vista de comprobación: lo seleccionado en color y lo demás oscurecido.
         let dark = Develop.exposure(photo.preview, ev: -2)
@@ -186,19 +188,21 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
         if arguments.count > index + 2 {
             model.open(URL(fileURLWithPath: arguments[index + 2]))
             RunLoop.main.run(until: Date().addingTimeInterval(2))
-            model.adjustments.vibrance = 30
-            model.adjustments.look = "cine"
-            if arguments.contains("--con-borrado") {
+            if arguments.contains("--tal-cual") {
+                // Con los ajustes guardados de la foto, sin tocar nada.
+            } else if arguments.contains("--con-borrado") {
                 model.adjustments.erase = [EraseStroke(points: [SelectionPoint(x: 0.54, y: 0.345), SelectionPoint(x: 0.56, y: 0.345)],
                                                        radius: 0.02)]
                 model.erasing = true
             } else {
+                model.adjustments.vibrance = 30
+                model.adjustments.look = "cine"
                 model.adjustments.skyReplacement = "nubes"
                 model.adjustments.selection = [SelectionPoint(x: 0.46, y: 0.42)]
                 model.selecting = true
             }
         }
-        RunLoop.main.run(until: Date().addingTimeInterval(arguments.contains("--con-borrado") ? 12 : 3))
+        RunLoop.main.run(until: Date().addingTimeInterval(arguments.contains("--con-borrado") || arguments.contains("--tal-cual") ? 12 : 3))
         let view = NSHostingView(rootView: EditorView(model: model))
         view.appearance = NSAppearance(named: .darkAqua)
         view.frame = NSRect(x: 0, y: 0, width: 1280, height: 800)

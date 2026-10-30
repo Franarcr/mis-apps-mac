@@ -103,8 +103,11 @@ enum Exporter {
 
     /// `upscale`: 1 (tamaño original), 2 o 4 (con Real-ESRGAN). `progress` informa de la ampliación (0…1).
     static func export(_ photo: Photo, adjustments: Adjustments, to url: URL, format: Format, quality: Double,
-                       upscale: Int = 1, context: CIContext, progress: (Double) -> Void = { _ in }) throws {
-        guard var full = photo.fullImage() else { throw Photo.Failure.unreadable(photo.url.lastPathComponent) }
+                       upscale: Int = 1, usePreview: Bool = false, context: CIContext,
+                       progress: (Double) -> Void = { _ in }) throws {
+        // `usePreview`: revela la copia reducida, como la vista previa del editor (para pruebas).
+        guard var full = usePreview ? photo.preview : photo.fullImage() else { throw Photo.Failure.unreadable(photo.url.lastPathComponent) }
+        let scale = usePreview ? photo.previewScale : 1
         if !adjustments.erase.isEmpty, let erased = EraseModel.inpaint(full, strokes: adjustments.erase, context: context) {
             full = erased
         }
@@ -115,10 +118,10 @@ enum Exporter {
         if adjustments.usesSelection || adjustments.usesSky || adjustments.usesWater,
            let embedding = SegmentModel.encode(full, context: context) {
             if adjustments.usesWater {
-                water = SegmentModel.mask(embedding, points: adjustments.water, extent: full.extent)
+                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: full.extent)
             }
             if adjustments.usesSelection {
-                selection = SegmentModel.mask(embedding, points: adjustments.selection, extent: full.extent)
+                selection = SegmentModel.objectMask(embedding, points: adjustments.selection, extent: full.extent)
             }
             if adjustments.usesSky {
                 sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true,
@@ -126,7 +129,7 @@ enum Exporter {
             }
         }
         var output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
-                                   selection: selection, sky: sky, water: water, scale: 1)
+                                   selection: selection, sky: sky, water: water, scale: scale)
         if upscale > 1 {
             output = try UpscaleModel.upscale(output, factor: upscale, context: context, progress: progress)
         }

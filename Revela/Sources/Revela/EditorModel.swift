@@ -270,7 +270,7 @@ final class EditorModel: ObservableObject {
         let points = adjustments.selection
         guard !points.isEmpty else { selectionMask = nil; scheduleRender(); return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.mask(embedding, points: points, extent: photo.preview.extent)
+            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent)
             DispatchQueue.main.async {
                 guard self.photo === photo, self.adjustments.selection == points else { return }
                 self.selectionMask = mask
@@ -302,7 +302,7 @@ final class EditorModel: ObservableObject {
         let points = adjustments.water
         guard !points.isEmpty else { waterMask = nil; scheduleRender(); return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.mask(embedding, points: points, extent: photo.preview.extent)
+            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent)
             DispatchQueue.main.async {
                 guard self.photo === photo, self.adjustments.water == points else { return }
                 self.waterMask = mask
@@ -310,6 +310,9 @@ final class EditorModel: ObservableObject {
             }
         }
     }
+
+    func undoWaterClick() { if !adjustments.water.isEmpty { adjustments.water.removeLast() } }
+    func undoSelectionClick() { if !adjustments.selection.isEmpty { adjustments.selection.removeLast() } }
 
     func clearWater() {
         adjustments.water = []

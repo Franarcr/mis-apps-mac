@@ -57,6 +57,19 @@ extension SegmentModel {
 
     /// Máscara (blanco = seleccionado) del tamaño `extent` para los clics dados.
     /// `connectedToTop`: para el cielo, solo cuenta lo que está unido al borde de arriba (quita reflejos sueltos).
+    /// Selección hecha con clics: cada clic que suma da su propia máscara (con los clics que restan) y se
+    /// juntan. Si se le pasan a SAM a la vez clics en cosas distintas (agua y cielo, por ejemplo), busca
+    /// un solo objeto que lo abarque todo, se confunde y devuelve una máscara a cuadros.
+    static func objectMask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect) -> CIImage? {
+        let negatives = points.filter { !$0.include }
+        let masks = points.filter(\.include).compactMap { mask(embedding, points: [$0] + negatives, extent: extent) }
+        guard var union = masks.first else { return nil }
+        for other in masks.dropFirst() {
+            union = union.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: other])
+        }
+        return union.cropped(to: extent)
+    }
+
     /// `guide`: la foto; para el cielo, el borde de la máscara se ajusta al color de la foto
     /// (la máscara de SAM es de 256 × 256 y, estirada a la foto completa, queda gruesa).
     static func mask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect, connectedToTop: Bool = false,

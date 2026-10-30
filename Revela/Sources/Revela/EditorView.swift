@@ -279,6 +279,7 @@ struct EditorView: View {
                     .toggleStyle(.button)
                     .tint(.orange)
                 if !model.adjustments.selection.isEmpty {
+                    Button("Deshacer clic") { model.undoSelectionClick() }
                     Button("Quitar") { model.clearSelection() }
                 }
             }
@@ -324,7 +325,10 @@ struct EditorView: View {
                 Toggle(model.markingWater ? "Marcando…" : "Marcar el agua", isOn: $model.markingWater)
                     .toggleStyle(.button)
                     .tint(.blue)
-                if !model.adjustments.water.isEmpty { Button("Quitar") { model.clearWater() } }
+                if !model.adjustments.water.isEmpty {
+                    Button("Deshacer clic") { model.undoWaterClick() }
+                    Button("Quitar") { model.clearWater() }
+                }
             }
             if model.adjustments.water.isEmpty {
                 Text("Pulsa «Marcar el agua» y haz clic en el mar, el lago o el río para que haga juego con el cielo.")
