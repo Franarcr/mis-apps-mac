@@ -73,6 +73,9 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
         }
     }
     if let h = arguments.firstIndex(of: "--bruma"), arguments.count > h + 1 { a.skyHaze = Double(arguments[h + 1]) ?? 0 }
+    if let h = arguments.firstIndex(of: "--cielo"), arguments.count > h + 1 { a.skyReplacement = arguments[h + 1]; a.skyAmount = 100 }
+    if let h = arguments.firstIndex(of: "--neblina"), arguments.count > h + 1 { a.dehaze = Double(arguments[h + 1]) ?? 0 }
+    if let h = arguments.firstIndex(of: "--reiluminar"), arguments.count > h + 1 { a.relight = Double(arguments[h + 1]) ?? 0 }
     // --agua x,y tono reflejo luz: prueba los ajustes de agua sin guardarlos.
     if let w = arguments.firstIndex(of: "--agua"), arguments.count > w + 4 {
         let v = arguments[w + 1].split(separator: ",").compactMap { Double($0) }

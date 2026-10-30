@@ -30,6 +30,7 @@ struct Adjustments: Codable, Equatable {
     var subjectLight: Double = 0    // -100…100
     var backgroundLight: Double = 0 // -100…100
     var lensBlur: Double = 0        // 0…100, según la profundidad
+    var dehaze: Double = 0          // 0…100: quitar la neblina de lo lejano (con la profundidad)
     // Retrato
     var skinSmoothing: Double = 0   // 0…100
     var eyes: Double = 0            // 0…100
@@ -47,6 +48,7 @@ struct Adjustments: Codable, Equatable {
     var skyAmount: Double = 100
     var skyHarmonize: Double = 0    // 0…100: el resto de la foto toma color y luz del cielo
     var skyHaze: Double = 0         // 0…100: bruma del color del cielo nuevo junto al horizonte
+    var relight: Double = 0         // 0…100: el paisaje toma la luz del cielo (sol o tormenta)
 
     // Agua: dónde se hizo clic y sus ajustes
     var water: [SelectionPoint] = []
@@ -57,11 +59,11 @@ struct Adjustments: Codable, Equatable {
     var erase: [EraseStroke] = []
 
     var usesSelection: Bool { !selection.isEmpty }
-    var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil || skyHarmonize > 0 }
+    var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil || skyHarmonize > 0 || relight > 0 }
     var usesWater: Bool { !water.isEmpty }
     var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
     var usesFaces: Bool { skinSmoothing > 0 || eyes > 0 || teeth > 0 }
-    var usesDepth: Bool { lensBlur > 0 }
+    var usesDepth: Bool { lensBlur > 0 || dehaze > 0 || relight > 0 }
 
     init() {}
 
@@ -78,6 +80,7 @@ struct Adjustments: Codable, Equatable {
         read(.lensBlur, &lensBlur); read(.skinSmoothing, &skinSmoothing); read(.eyes, &eyes); read(.teeth, &teeth)
         read(.selExposure, &selExposure); read(.selContrast, &selContrast); read(.selSaturation, &selSaturation)
         read(.selTemperature, &selTemperature); read(.skyLight, &skyLight); read(.skyEnhance, &skyEnhance); read(.skyAmount, &skyAmount); read(.skyHarmonize, &skyHarmonize); read(.skyHaze, &skyHaze)
+        read(.dehaze, &dehaze); read(.relight, &relight)
         selection = (try? c.decode([SelectionPoint].self, forKey: .selection)) ?? []
         erase = (try? c.decode([EraseStroke].self, forKey: .erase)) ?? []
         water = (try? c.decode([SelectionPoint].self, forKey: .water)) ?? []
@@ -132,6 +135,9 @@ enum Develop {
             if a.teeth > 0 { img = Retouch.whitenTeeth(img, masks: faces, amount: a.teeth) }
         }
 
+        // Neblina: antes del cielo, con el cielo de la foto todavía (su color es el del aire).
+        if a.dehaze > 0 { img = Atmosphere.dehaze(img, depth: depth, sky: sky, amount: a.dehaze) }
+
         // Cielo: se cambia o se realza antes de los ajustes generales, para que todo quede con el mismo tono.
         if let sky, a.usesSky {
             img = Skies.apply(a, to: img, mask: sky)
@@ -143,6 +149,9 @@ enum Develop {
             if let sky { water = Arith.mul(water, sky.applyingFilter("CIColorInvert")).applyingFilter("CIColorClamp") }
             img = Water.apply(a, to: img, water: water, sky: sky)
         }
+
+        // Reiluminar: con el cielo ya puesto, el paisaje toma su luz.
+        if a.relight > 0 { img = Atmosphere.relight(img, sky: sky, depth: depth, amount: a.relight) }
 
         // Ajustes solo en la zona seleccionada con un clic.
         if let selection, a.selExposure != 0 || a.selContrast != 0 || a.selSaturation != 0 || a.selTemperature != 0 {

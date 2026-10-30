@@ -155,6 +155,8 @@ struct EditorView: View {
                     slider("Desenfocar fondo", \.backgroundBlur, 0...100)
                     if model.depthInstalled {
                         slider("Desenfoque de lente", \.lensBlur, 0...100)
+                        slider("Quitar neblina", \.dehaze, 0...100)
+                            .help("Quita el velo gris de lo lejano según la distancia; lo cercano y el cielo no cambian")
                     } else {
                         Button("Descargar desenfoque de lente (50 MB)…") { model.installDepthModel() }
                             .help("Modelo Depth Anything V2 de Apple: calcula la distancia de cada punto de la foto.")
@@ -333,6 +335,8 @@ struct EditorView: View {
             }
             slider("Armonizar con el cielo", \.skyHarmonize, 0...100)
                 .help("El paisaje toma algo del color y la luz del cielo, como si lo iluminara")
+            slider("Reiluminar la escena", \.relight, 0...100)
+                .help("Luz de sol o de tormenta según el cielo: aclara u oscurece el paisaje, limpia el tono gris y da contraste")
         } else {
             downloadSegmentButton
         }
