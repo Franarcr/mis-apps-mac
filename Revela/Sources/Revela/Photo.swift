@@ -101,8 +101,9 @@ enum Exporter {
         var fileExtension: String { ["JPEG": "jpg", "HEIC": "heic", "PNG": "png", "TIFF": "tif"][rawValue]! }
     }
 
+    /// `upscale`: 1 (tamaño original), 2 o 4 (con Real-ESRGAN). `progress` informa de la ampliación (0…1).
     static func export(_ photo: Photo, adjustments: Adjustments, to url: URL, format: Format, quality: Double,
-                       context: CIContext) throws {
+                       upscale: Int = 1, context: CIContext, progress: (Double) -> Void = { _ in }) throws {
         guard var full = photo.fullImage() else { throw Photo.Failure.unreadable(photo.url.lastPathComponent) }
         if !adjustments.erase.isEmpty, let erased = EraseModel.inpaint(full, strokes: adjustments.erase, context: context) {
             full = erased
@@ -119,8 +120,11 @@ enum Exporter {
                 sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true)
             }
         }
-        let output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
+        var output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
                                    selection: selection, sky: sky, scale: 1)
+        if upscale > 1 {
+            output = try UpscaleModel.upscale(output, factor: upscale, context: context, progress: progress)
+        }
         let space = CGColorSpace(name: CGColorSpace.displayP3)!
         let options: [CIImageRepresentationOption: Any] = [
             CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality,

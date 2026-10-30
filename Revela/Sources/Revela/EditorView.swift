@@ -191,6 +191,22 @@ struct EditorView: View {
                             Text("\(Int(model.exportQuality * 100)) %").monospacedDigit().frame(width: 40, alignment: .trailing)
                         }
                     }
+                    if model.upscaleInstalled {
+                        Picker("Tamaño", selection: $model.exportUpscale) {
+                            Text("Original").tag(1)
+                            Text("×2 con IA").tag(2)
+                            Text("×4 con IA").tag(4)
+                        }
+                        if model.exportUpscale > 1, let photo = model.photo {
+                            let w = Int(photo.fullSize.width) * model.exportUpscale, h = Int(photo.fullSize.height) * model.exportUpscale
+                            let mp = Double(w * h) / 1_000_000
+                            Text("\(w) × \(h)" + String(format: " · %.0f MP", mp) + (mp > UpscaleModel.maxOutputMegapixels ? " · demasiado grande" : ""))
+                                .font(.caption).foregroundStyle(mp > UpscaleModel.maxOutputMegapixels ? .orange : .secondary)
+                        }
+                    } else {
+                        Button("Descargar ampliación con IA (67 MB)…") { model.installUpscaleModel() }
+                            .help("Modelo Real-ESRGAN (licencia BSD): amplía ×2 o ×4 recuperando detalle.")
+                    }
                     Button("Aplicar estos ajustes a varias fotos…") { model.exportBatch() }
                 }
             }

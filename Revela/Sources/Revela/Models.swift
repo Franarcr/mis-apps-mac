@@ -6,8 +6,12 @@ import Foundation
 struct RemoteModel {
     let repo: String    // "apple/coreml-depth-anything-v2-small"
     let name: String    // nombre del .mlpackage, sin extensión
+    /// Algunos paquetes llevan los pesos dentro de model.mlmodel y no tienen weights/weight.bin.
+    var hasWeightsFile = true
 
-    private static let files = ["Manifest.json", "Data/com.apple.CoreML/model.mlmodel", "Data/com.apple.CoreML/weights/weight.bin"]
+    private var files: [String] {
+        ["Manifest.json", "Data/com.apple.CoreML/model.mlmodel"] + (hasWeightsFile ? ["Data/com.apple.CoreML/weights/weight.bin"] : [])
+    }
 
     static var folder: URL {
         let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -24,7 +28,7 @@ struct RemoteModel {
         let package = Self.folder.appendingPathComponent("\(name).mlpackage")
         try? FileManager.default.removeItem(at: package)
         let base = "https://huggingface.co/\(repo)/resolve/main/\(name).mlpackage/"
-        for (index, file) in Self.files.enumerated() {
+        for (index, file) in files.enumerated() {
             guard let url = URL(string: base + file) else { continue }
             let destination = package.appendingPathComponent(file)
             try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -39,7 +43,7 @@ struct RemoteModel {
                 do { try FileManager.default.moveItem(at: temp, to: destination) } catch { failure = error }
             }
             let observation = task.progress.observe(\.fractionCompleted) { p, _ in
-                progress((Double(index) + p.fractionCompleted) / Double(Self.files.count))
+                progress((Double(index) + p.fractionCompleted) / Double(files.count))
             }
             task.resume()
             semaphore.wait()

@@ -23,7 +23,8 @@ if let index = arguments.firstIndex(of: "--prueba"), arguments.count > index + 2
         let start = Date()
         let mask = Intelligence.subjectMask(for: photo.preview, context: context)
         print("Foto \(Int(photo.fullSize.width))×\(Int(photo.fullSize.height))\(photo.isRAW ? " RAW" : "") · sujeto: \(mask == nil ? "no" : "sí") · horizonte: \(Intelligence.horizonCorrection(for: photo.preview, context: context).map { String(format: "%.2f°", $0) } ?? "recto")")
-        try Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[index + 2]), format: .jpeg, quality: 0.9, context: context)
+        try Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[index + 2]), format: .jpeg, quality: 0.9,
+                            upscale: arguments.contains("--x2") ? 2 : 1, context: context)
         print(String(format: "Exportada en %.1f s", Date().timeIntervalSince(start)))
         exit(0)
     } catch {
@@ -47,6 +48,44 @@ if arguments.contains("--profundidad") {
         }
     }
     print(DepthModel.describe())
+    exit(0)
+}
+
+if arguments.contains("--ampliar") {
+    // Descarga Real-ESRGAN si falta y muestra sus entradas y salidas.
+    if !UpscaleModel.isInstalled {
+        var last = -1
+        do {
+            try UpscaleModel.install { p in
+                let percent = Int(p * 100)
+                if percent / 10 != last / 10 { last = percent; print("Descargando… \(percent) %") }
+            }
+        } catch {
+            print("Error: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+    print(UpscaleModel.remote.describe())
+    // Revela --ampliar foto salida-prefijo factor x,y,ancho,alto: amplía un recorte (en píxeles) y lo compara con Lanczos.
+    if let i = arguments.firstIndex(of: "--ampliar"), arguments.count > i + 4,
+       let photo = try? Photo(url: URL(fileURLWithPath: arguments[i + 1])), let full = photo.fullImage() {
+        let factor = Int(arguments[i + 3]) ?? 4
+        let v = arguments[i + 4].split(separator: ",").compactMap { Double($0) }
+        let crop = full.cropped(to: CGRect(x: v[0], y: v[1], width: v[2], height: v[3]))
+        let context = CIContext()
+        let start = Date()
+        do {
+            let big = try UpscaleModel.upscale(crop, factor: factor, context: context)
+            print(String(format: "Ampliada ×%d a %.0f×%.0f en %.1f s", factor, big.extent.width, big.extent.height, Date().timeIntervalSince(start)))
+            let space = CGColorSpace(name: CGColorSpace.sRGB)!
+            try context.writePNGRepresentation(of: big, to: URL(fileURLWithPath: arguments[i + 2] + "-ia.png"), format: .RGBA8, colorSpace: space)
+            let plain = crop.transformed(by: CGAffineTransform(translationX: -v[0], y: -v[1]))
+                .applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: factor, kCIInputAspectRatioKey: 1])
+            try context.writePNGRepresentation(of: plain, to: URL(fileURLWithPath: arguments[i + 2] + "-normal.png"), format: .RGBA8, colorSpace: space)
+        } catch {
+            print("Error: \(error.localizedDescription)")
+        }
+    }
     exit(0)
 }
 

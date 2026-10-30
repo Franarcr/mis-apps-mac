@@ -21,11 +21,12 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
 - **Retrato** (detección de caras de macOS): **suavizar piel** (conserva textura), **ojos** más claros y nítidos y **dientes** más blancos, solo en las zonas de cada cara.
 - **Antes / después** (botón *Antes* o la tecla `\`), **Deshacer** (⌘Z) y **Restablecer** (⇧⌘R). Doble clic en el nombre de un control lo devuelve a cero.
 - **Exportar** (⌘E) en JPEG, HEIC, PNG o TIFF de 16 bits, a resolución completa.
+- **Ampliar con IA al exportar** (Real-ESRGAN, licencia BSD-3, conversión a Core ML de MLBoy, ~67 MB, se descarga una vez): ×2 o ×4 recuperando detalle y quitando ruido. Se procesa en mosaicos de 512 px que se solapan. Hasta 120 megapíxeles de salida (un RAW de 24 MP a ×2 tarda algo más de un minuto en un M5).
 - **Aplicar a varias fotos** (⇧⌘E): revela un lote de fotos con los mismos ajustes y las guarda en una carpeta.
 
 ## Lo que no hace (frente a Luminar)
 
-Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativo, cambio de cielo, eliminar cables o polvo, ampliar ×2/×4/×6, reiluminar caras… Esos modelos no se pueden reutilizar. Revela usa la IA de macOS y modelos abiertos de uso libre; el siguiente previsto es ampliar (Real-ESRGAN). El borrado de LaMa es bueno con objetos pequeños y medianos; en zonas grandes y con mucho detalle puede verse borroso.
+Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativo, cambio de cielo, eliminar cables o polvo, ampliar ×2/×4/×6, reiluminar caras… Esos modelos no se pueden reutilizar. Revela usa la IA de macOS y modelos abiertos de uso libre; El borrado de LaMa es bueno con objetos pequeños y medianos; en zonas grandes y con mucho detalle puede verse borroso.
 
 ## Para pruebas
 
@@ -40,6 +41,8 @@ Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativ
 /Applications/Revela.app/Contents/MacOS/Revela --prueba foto.jpg salida.jpg --cielo atardecer
 # Descarga LaMa (si falta); con foto, borra círculos x,y,radio (de 0 a 1, origen abajo a la izquierda)
 /Applications/Revela.app/Contents/MacOS/Revela --borrar [foto salida.jpg 0.55,0.35,0.02 …]
+# Descarga Real-ESRGAN (si falta); con foto, amplía un recorte en píxeles y lo compara con una ampliación normal
+/Applications/Revela.app/Contents/MacOS/Revela --ampliar [foto prefijo 4 x,y,ancho,alto]
 ```
 
 Los ajustes de cada foto están en `~/Library/Application Support/Revela/ediciones.json` y los LUT importados en `~/Library/Application Support/Revela/LUT/`.

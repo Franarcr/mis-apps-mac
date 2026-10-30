@@ -32,6 +32,11 @@ final class EditorModel: ObservableObject {
     @Published var exportQuality = UserDefaults.standard.object(forKey: "calidad") as? Double ?? 0.9 {
         didSet { UserDefaults.standard.set(exportQuality, forKey: "calidad") }
     }
+    /// Ampliar al exportar: 1 = tamaño original, 2 o 4 con IA.
+    @Published var exportUpscale = UserDefaults.standard.object(forKey: "ampliar") as? Int ?? 1 {
+        didSet { UserDefaults.standard.set(exportUpscale, forKey: "ampliar") }
+    }
+    @Published private(set) var upscaleInstalled = UpscaleModel.isInstalled
     /// Estado de vista (sin @State: estas herramientas de compilación no traen sus macros).
     @Published var dropTargeted = false
 
@@ -369,6 +374,27 @@ final class EditorModel: ObservableObject {
         }
     }
 
+    func installUpscaleModel() {
+        busy = "Descargando el modelo de ampliación… 0 %"
+        Self.queue.async {
+            let result = Result {
+                try UpscaleModel.install { progress in
+                    DispatchQueue.main.async { self.busy = "Descargando el modelo de ampliación… \(Int(progress * 100)) %" }
+                }
+            }
+            DispatchQueue.main.async {
+                self.busy = nil
+                switch result {
+                case .success:
+                    self.upscaleInstalled = true
+                    self.status = "Modelo de ampliación instalado"
+                case .failure(let error):
+                    self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
     func straightenHorizon() {
         guard let photo else { return }
         busy = "Buscando el horizonte…"
@@ -460,17 +486,23 @@ final class EditorModel: ObservableObject {
 
     private func run(photos: [URL], to destination: @escaping (URL) -> URL) {
         let adjustments = adjustments, format = exportFormat, quality = exportQuality
+        let upscale = upscaleInstalled ? exportUpscale : 1
         busy = photos.count == 1 ? "Exportando…" : "Exportando 1 de \(photos.count)…"
         Self.queue.async {
             var failures: [String] = []
+            var lastError = ""
             for (index, url) in photos.enumerated() {
                 DispatchQueue.main.async { if photos.count > 1 { self.busy = "Exportando \(index + 1) de \(photos.count)…" } }
                 do {
                     let photo = try Photo(url: url)
+                    let label = photos.count > 1 ? "Exportando \(index + 1) de \(photos.count)" : "Exportando"
                     try Exporter.export(photo, adjustments: adjustments, to: destination(url), format: format,
-                                        quality: quality, context: Self.context)
+                                        quality: quality, upscale: upscale, context: Self.context) { progress in
+                        DispatchQueue.main.async { self.busy = "\(label) · ampliando \(Int(progress * 100)) %…" }
+                    }
                 } catch {
                     failures.append(url.lastPathComponent)
+                    lastError = error.localizedDescription
                 }
             }
             DispatchQueue.main.async {
@@ -478,6 +510,7 @@ final class EditorModel: ObservableObject {
                 let done = photos.count - failures.count
                 self.status = failures.isEmpty
                     ? (done == 1 ? "Foto exportada" : "\(done) fotos exportadas")
+                    : done == 0 && photos.count == 1 ? "No se pudo exportar: \(lastError)"
                     : "Exportadas \(done) de \(photos.count). Fallaron: \(failures.joined(separator: ", "))"
                 if done > 0 {
                     NSWorkspace.shared.activateFileViewerSelecting(photos.prefix(1).map(destination))
