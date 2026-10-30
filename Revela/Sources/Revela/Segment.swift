@@ -122,7 +122,24 @@ extension SegmentModel {
             ])
             .cropped(to: extent)
         guard let guide else { return coarse }
-        return EdgeRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: extent.width / CGFloat(width))
+        let cell = extent.width / CGFloat(width)
+        let wide = EdgeRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: cell)
+        guard connectedToTop else { return wide }
+        // Junto al horizonte, la franja ancha (para el cielo que asoma por rejillas y ramas) se come fachadas,
+        // barandas y tejados lejanos que la niebla deja del color del cielo. Allí el borde se ajusta solo
+        // en una franja estrecha; la ancha vale a partir de un 8 % de la altura por encima del horizonte.
+        let tight = EdgeRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: cell, reach: 1.5)
+        // Y el borde se difumina hacia fuera: con niebla, lo lejano se funde con el cielo (las copas de los
+        // árboles no quedan recortadas con la forma gruesa de la máscara de SAM).
+        let soft = tight.clampedToExtent().applyingGaussianBlur(sigma: Double(cell)).cropped(to: extent)
+            .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: tight]).cropped(to: extent)
+        let horizon = Skies.horizon(of: coarse, in: extent)
+        let f = CIFilter.linearGradient()
+        f.point0 = CGPoint(x: 0, y: horizon + extent.height * 0.08)
+        f.point1 = CGPoint(x: 0, y: horizon + extent.height * 0.03)
+        f.color0 = CIColor(red: 1, green: 1, blue: 1)
+        f.color1 = CIColor(red: 0, green: 0, blue: 0)
+        return Develop.blend(wide, over: soft, mask: f.outputImage!.cropped(to: extent)).cropped(to: extent)
     }
 
     /// Deja solo las zonas unidas a la fila de arriba (y su borde suave); el resto, a cero.
