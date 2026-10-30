@@ -327,6 +327,8 @@ struct EditorView: View {
             }
             Button("Añadir fotos de cielo…") { model.chooseSkyPhoto() }
             if model.adjustments.skyReplacement != nil { slider("Intensidad del cielo", \.skyAmount, 0...100) }
+            slider("Armonizar con el cielo", \.skyHarmonize, 0...100)
+                .help("El paisaje toma algo del color y la luz del cielo, como si lo iluminara")
         } else {
             downloadSegmentButton
         }

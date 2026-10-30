@@ -45,6 +45,7 @@ struct Adjustments: Codable, Equatable {
     var skyEnhance: Double = 0      // 0…100
     var skyReplacement: String?     // cielo incluido o ruta de una foto de cielo
     var skyAmount: Double = 100
+    var skyHarmonize: Double = 0    // 0…100: el resto de la foto toma color y luz del cielo
 
     // Agua: dónde se hizo clic y sus ajustes
     var water: [SelectionPoint] = []
@@ -55,7 +56,7 @@ struct Adjustments: Codable, Equatable {
     var erase: [EraseStroke] = []
 
     var usesSelection: Bool { !selection.isEmpty }
-    var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil }
+    var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil || skyHarmonize > 0 }
     var usesWater: Bool { !water.isEmpty }
     var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
     var usesFaces: Bool { skinSmoothing > 0 || eyes > 0 || teeth > 0 }
@@ -75,7 +76,7 @@ struct Adjustments: Codable, Equatable {
         read(.backgroundBlur, &backgroundBlur); read(.subjectLight, &subjectLight); read(.backgroundLight, &backgroundLight)
         read(.lensBlur, &lensBlur); read(.skinSmoothing, &skinSmoothing); read(.eyes, &eyes); read(.teeth, &teeth)
         read(.selExposure, &selExposure); read(.selContrast, &selContrast); read(.selSaturation, &selSaturation)
-        read(.selTemperature, &selTemperature); read(.skyLight, &skyLight); read(.skyEnhance, &skyEnhance); read(.skyAmount, &skyAmount)
+        read(.selTemperature, &selTemperature); read(.skyLight, &skyLight); read(.skyEnhance, &skyEnhance); read(.skyAmount, &skyAmount); read(.skyHarmonize, &skyHarmonize)
         selection = (try? c.decode([SelectionPoint].self, forKey: .selection)) ?? []
         erase = (try? c.decode([EraseStroke].self, forKey: .erase)) ?? []
         water = (try? c.decode([SelectionPoint].self, forKey: .water)) ?? []

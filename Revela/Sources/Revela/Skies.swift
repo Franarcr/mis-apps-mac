@@ -64,8 +64,47 @@ enum Skies {
             sky = v.outputImage ?? sky
         }
         if a.skyLight != 0 { sky = Develop.exposure(sky, ev: a.skyLight / 100 * 1.2) }
-        // La máscara ya llega ajustada a los bordes de la foto (SkyRefiner): no se difumina más.
-        return Develop.blend(sky, over: image, mask: mask)
+        let ground = a.skyHarmonize > 0 ? harmonize(image, newSky: sky, mask: mask, amount: a.skyHarmonize / 100) : image
+        // La máscara ya llega ajustada a los bordes de la foto (EdgeRefiner): no se difumina más.
+        return Develop.blend(sky, over: ground, mask: mask)
+    }
+
+    /// «Armonizar con el cielo»: el resto de la foto toma algo del color y de la luz del cielo nuevo,
+    /// como si la escena estuviera iluminada por él (un atardecer calienta el paisaje, una tormenta lo apaga).
+    static func harmonize(_ image: CIImage, newSky: CIImage, mask: CIImage, amount: Double) -> CIImage {
+        let extent = image.extent
+        guard let old = average(image, mask: mask, extent: extent),
+              let new = average(newSky, mask: mask, extent: extent) else { return image }
+        func luma(_ c: [Float]) -> Float { max(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], 0.001) }
+        // Color: el tinte del cielo nuevo (su color dividido por su brillo), aplicado con suavidad.
+        let k = Float(amount) * 0.8
+        let tint = (0..<3).map { 1 + k * (new[$0] / luma(new) - 1) }
+        let normalize = 1 / max(0.299 * tint[0] + 0.587 * tint[1] + 0.114 * tint[2], 0.001)   // sin cambiar el brillo
+        var result = image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: CGFloat(tint[0] * normalize), y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: CGFloat(tint[1] * normalize), z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: CGFloat(tint[2] * normalize), w: 0),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ])
+        // Luz: parte de la diferencia de brillo entre el cielo nuevo y el original (como mucho ±1,2 pasos).
+        let ev = Double(log2(luma(new) / luma(old))) * 0.8 * amount
+        if abs(ev) > 0.01 { result = Develop.exposure(result, ev: min(max(ev, -1.2), 1.2)) }
+        return result.cropped(to: extent)
+    }
+
+    /// Color medio de `image` dentro de la máscara (media(foto × máscara) / media(máscara)).
+    private static func average(_ image: CIImage, mask: CIImage, extent: CGRect) -> [Float]? {
+        func mean(_ x: CIImage) -> [Float] {
+            let avg = x.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: extent)])
+            var pixel = [Float](repeating: 0, count: 4)
+            context.render(avg, toBitmap: &pixel, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                           format: .RGBAf, colorSpace: nil)
+            return pixel
+        }
+        let area = mean(mask)[0]
+        guard area > 0.02 else { return nil }
+        let weighted = mean(image.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: mask]))
+        return (0..<3).map { weighted[$0] / area }
     }
 
     private static var fileCache: [String: CIImage] = [:]

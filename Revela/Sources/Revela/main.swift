@@ -14,6 +14,7 @@ if let index = arguments.firstIndex(of: "--prueba"), arguments.count > index + 2
         if arguments.contains("--lente") { a.lensBlur = 80 }
         if let i = arguments.firstIndex(of: "--cielo"), arguments.count > i + 1 {
             a = Adjustments(); a.skyReplacement = arguments[i + 1]; a.skyEnhance = 20; a.vibrance = 20
+            if let h = arguments.firstIndex(of: "--armonizar"), arguments.count > h + 1 { a.skyHarmonize = Double(arguments[h + 1]) ?? 0 }
         }
         if !arguments.contains("--cielo") {
             a.look = arguments.count > index + 3 && !arguments[index + 3].hasPrefix("--") ? arguments[index + 3] : "cine"
