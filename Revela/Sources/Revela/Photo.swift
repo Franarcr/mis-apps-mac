@@ -103,7 +103,10 @@ enum Exporter {
 
     static func export(_ photo: Photo, adjustments: Adjustments, to url: URL, format: Format, quality: Double,
                        context: CIContext) throws {
-        guard let full = photo.fullImage() else { throw Photo.Failure.unreadable(photo.url.lastPathComponent) }
+        guard var full = photo.fullImage() else { throw Photo.Failure.unreadable(photo.url.lastPathComponent) }
+        if !adjustments.erase.isEmpty, let erased = EraseModel.inpaint(full, strokes: adjustments.erase, context: context) {
+            full = erased
+        }
         let mask = adjustments.usesSubjectMask || adjustments.usesDepth ? Intelligence.subjectMask(for: full, context: context) : nil
         let faces = adjustments.usesFaces ? FaceMasks.detect(in: full, context: context) : nil
         let depth = adjustments.usesDepth ? DepthInfo.compute(for: full, subject: mask, context: context) : nil

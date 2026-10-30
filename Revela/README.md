@@ -15,6 +15,7 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
   - **Desenfocar fondo**: detecta el sujeto (personas, animales u objetos) y desenfoca lo demás, como el modo retrato.
   - **Luz del sujeto / Luz del fondo**: ilumina u oscurece por separado al sujeto y al fondo.
   - **Desenfoque de lente**: desenfoca según la distancia de cada punto, como un objetivo luminoso; el sujeto queda enfocado. Usa el modelo **Depth Anything V2** de Apple (licencia Apache 2.0, ~50 MB), que se descarga una sola vez con el botón *Descargar desenfoque de lente* y se guarda en `~/Library/Application Support/Revela/Modelos/`.
+- **Borrar objetos** (LaMa, licencia Apache 2.0, conversión a Core ML de MLBoy, ~217 MB, se descarga una vez): pulsa *Pincel* y pinta sobre personas, cables, manchas o cualquier cosa; se rellena con lo que debería haber detrás. Solo se procesa un recorte alrededor de lo pintado, así la foto conserva su resolución completa. *Deshacer trazo* y *Quitar todo* lo revierten.
 - **Selección con un clic** (SAM 2.1 de Apple, licencia Apache 2.0, ~94 MB, se descarga una vez): pulsa *Seleccionar* y haz clic en una persona, el agua, un edificio… (⌥ clic quita una zona). Luego ajusta solo esa zona: exposición, contraste, saturación y temperatura.
 - **Cielo** (con el mismo modelo): *Luz del cielo* y *Realzar cielo* para el cielo de la foto, o **Cambiar cielo** por uno de los incluidos (despejado, con nubes, atardecer, hora dorada, tormenta) o por una foto de cielo tuya.
 - **Retrato** (detección de caras de macOS): **suavizar piel** (conserva textura), **ojos** más claros y nítidos y **dientes** más blancos, solo en las zonas de cada cara.
@@ -24,7 +25,7 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
 
 ## Lo que no hace (frente a Luminar)
 
-Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativo, cambio de cielo, eliminar cables o polvo, ampliar ×2/×4/×6, reiluminar caras… Esos modelos no se pueden reutilizar. Revela usa la IA de macOS y modelos abiertos de uso libre; los siguientes previstos son borrar objetos (LaMa) y ampliar (Real-ESRGAN).
+Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativo, cambio de cielo, eliminar cables o polvo, ampliar ×2/×4/×6, reiluminar caras… Esos modelos no se pueden reutilizar. Revela usa la IA de macOS y modelos abiertos de uso libre; el siguiente previsto es ampliar (Real-ESRGAN). El borrado de LaMa es bueno con objetos pequeños y medianos; en zonas grandes y con mucho detalle puede verse borroso.
 
 ## Para pruebas
 
@@ -37,6 +38,8 @@ Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativ
 /Applications/Revela.app/Contents/MacOS/Revela --seleccion [foto salida.jpg 0.5,0.4 …]
 # Cambia el cielo de una foto (despejado, nubes, atardecer, dorado, tormenta o la ruta de una foto)
 /Applications/Revela.app/Contents/MacOS/Revela --prueba foto.jpg salida.jpg --cielo atardecer
+# Descarga LaMa (si falta); con foto, borra círculos x,y,radio (de 0 a 1, origen abajo a la izquierda)
+/Applications/Revela.app/Contents/MacOS/Revela --borrar [foto salida.jpg 0.55,0.35,0.02 …]
 ```
 
 Los ajustes de cada foto están en `~/Library/Application Support/Revela/ediciones.json` y los LUT importados en `~/Library/Application Support/Revela/LUT/`.

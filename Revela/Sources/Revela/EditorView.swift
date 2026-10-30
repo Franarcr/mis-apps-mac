@@ -27,12 +27,26 @@ struct EditorView: View {
                         .resizable()
                         .interpolation(.high)
                         .frame(width: rect.width, height: rect.height)
+                        .overlay(strokeOverlay(in: rect.size))
                         .contentShape(Rectangle())
                         .gesture(SpatialTapGesture().onEnded { tap in
                             guard model.selecting else { return }
                             model.addSelectionPoint(x: tap.location.x / rect.width, y: 1 - tap.location.y / rect.height,
                                                     include: !NSEvent.modifierFlags.contains(.option))
                         })
+                        .simultaneousGesture(DragGesture(minimumDistance: 0)
+                            .onChanged { drag in
+                                guard model.erasing else { return }
+                                model.currentStroke.append(drag.location)
+                            }
+                            .onEnded { _ in
+                                guard model.erasing else { return }
+                                let points = model.currentStroke.map {
+                                    SelectionPoint(x: $0.x / rect.width, y: 1 - $0.y / rect.height)
+                                }
+                                model.currentStroke = []
+                                model.addEraseStroke(points)
+                            })
                         .position(x: rect.midX, y: rect.midY)
                 }
             } else if model.busy == nil {
@@ -46,6 +60,12 @@ struct EditorView: View {
             }
             VStack {
                 toolbar
+                if model.erasing {
+                    Text("Pinta sobre lo que quieras borrar")
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.red.opacity(0.85), in: Capsule())
+                }
                 if model.selecting {
                     Text("Haz clic en lo que quieras seleccionar · ⌥ clic para quitar una zona")
                         .font(.callout.weight(.medium))
@@ -132,6 +152,7 @@ struct EditorView: View {
                     Text("Usa la IA de macOS, sin internet: detecta personas, animales y objetos principales.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
+                section("Borrar objetos", icon: "eraser") { eraseControls }
                 section("Selección con un clic", icon: "hand.point.up.left") { selectionControls }
                 section("Cielo", icon: "cloud.sun") { skyControls }
                 section("Retrato", icon: "face.smiling") {
@@ -178,6 +199,45 @@ struct EditorView: View {
             .opacity(model.photo == nil ? 0.5 : 1)
         }
         .font(.callout)
+    }
+
+    /// El trazo que se está pintando (en rojo), en coordenadas de la foto en pantalla.
+    private func strokeOverlay(in size: CGSize) -> some View {
+        Path { path in
+            guard let first = model.currentStroke.first else { return }
+            path.move(to: first)
+            model.currentStroke.dropFirst().forEach { path.addLine(to: $0) }
+        }
+        .stroke(Color.red.opacity(0.55), style: StrokeStyle(lineWidth: max(2, size.width * model.brushSize / 100),
+                                                             lineCap: .round, lineJoin: .round))
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder private var eraseControls: some View {
+        if model.eraseInstalled {
+            HStack {
+                Toggle(model.erasing ? "Pintando…" : "Pincel", isOn: $model.erasing)
+                    .toggleStyle(.button)
+                    .tint(.red)
+                if !model.adjustments.erase.isEmpty {
+                    Button("Deshacer trazo") { model.undoEraseStroke() }
+                    Button("Quitar todo") { model.clearErase() }
+                }
+            }
+            HStack {
+                Text("Tamaño")
+                Slider(value: $model.brushSize, in: 0.5...12)
+                Text(String(format: "%.0f", model.brushSize)).monospacedDigit().frame(width: 24, alignment: .trailing)
+            }
+            Text("Pinta sobre personas, cables, manchas o cualquier cosa; se rellena con lo que debería haber detrás.")
+                .font(.caption2).foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Button("Descargar borrado de objetos (217 MB)…") { model.installEraseModel() }
+                Text("Modelo LaMa (licencia Apache 2.0): rellena lo que pintes con lo que debería haber detrás.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var downloadSegmentButton: some View {

@@ -46,6 +46,9 @@ struct Adjustments: Codable, Equatable {
     var skyReplacement: String?     // cielo incluido o ruta de una foto de cielo
     var skyAmount: Double = 100
 
+    // Borrar objetos (LaMa): trazos del pincel
+    var erase: [EraseStroke] = []
+
     var usesSelection: Bool { !selection.isEmpty }
     var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil }
     var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
@@ -68,6 +71,7 @@ struct Adjustments: Codable, Equatable {
         read(.selExposure, &selExposure); read(.selContrast, &selContrast); read(.selSaturation, &selSaturation)
         read(.selTemperature, &selTemperature); read(.skyLight, &skyLight); read(.skyEnhance, &skyEnhance); read(.skyAmount, &skyAmount)
         selection = (try? c.decode([SelectionPoint].self, forKey: .selection)) ?? []
+        erase = (try? c.decode([EraseStroke].self, forKey: .erase)) ?? []
         skyReplacement = try? c.decode(String.self, forKey: .skyReplacement)
         look = try? c.decode(String.self, forKey: .look)
         autoEnhance = (try? c.decode(Bool.self, forKey: .autoEnhance)) ?? false

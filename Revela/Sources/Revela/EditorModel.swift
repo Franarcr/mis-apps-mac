@@ -14,6 +14,7 @@ final class EditorModel: ObservableObject {
             if adjustments.usesFaces, faces == nil { detectFaces() }
             if adjustments.usesDepth, depth == nil { computeDepth() }
             if adjustments.selection != oldValue.selection { updateSelectionMask() }
+            if adjustments.erase != oldValue.erase { updateErased() }
             if adjustments.usesSky, skyMask == nil { computeSkyMask() }
             scheduleRender()
             saveEdits()
@@ -47,7 +48,17 @@ final class EditorModel: ObservableObject {
     @Published private(set) var depthInstalled = DepthModel.isInstalled
     @Published private(set) var segmentInstalled = SegmentModel.isInstalled
     /// Modo «seleccionar con un clic»: los clics en la foto añaden puntos y se ve la zona elegida.
-    @Published var selecting = false { didSet { scheduleRender() } }
+    @Published var selecting = false {
+        didSet { if selecting { erasing = false }; scheduleRender() }
+    }
+    /// Modo «borrar objetos»: arrastrar sobre la foto pinta lo que se borra.
+    @Published var erasing = false { didSet { if erasing { selecting = false } } }
+    @Published var brushSize = 3.0   // % del ancho de la foto
+    /// Trazo en curso, en puntos de la vista (mientras se arrastra).
+    @Published var currentStroke: [CGPoint] = []
+    @Published private(set) var eraseInstalled = EraseModel.isInstalled
+    /// La foto con lo pintado ya borrado (vista previa); nil si no hay nada borrado.
+    private var erasedPreview: CIImage?
     private var embedding: SegmentModel.Embedding?
     private var selectionMask: CIImage?
     private var skyMask: CIImage?
@@ -85,7 +96,9 @@ final class EditorModel: ObservableObject {
                     self.embedding = nil
                     self.selectionMask = nil
                     self.skyMask = nil
+                    self.erasedPreview = nil
                     self.selecting = false
+                    self.erasing = false
                     self.undoStack = []
                     self.restoring = true
                     self.adjustments = EditStore.load(for: url) ?? Adjustments()
@@ -96,6 +109,7 @@ final class EditorModel: ObservableObject {
                     if self.adjustments.usesDepth { self.computeDepth() }
                     if self.adjustments.usesSelection { self.updateSelectionMask() }
                     if self.adjustments.usesSky { self.computeSkyMask() }
+                    if !self.adjustments.erase.isEmpty { self.updateErased() }
                     self.scheduleRender()
                 case .failure(let error):
                     self.status = error.localizedDescription
@@ -112,8 +126,9 @@ final class EditorModel: ObservableObject {
         rendering = true
         let adjustments = adjustments, mask = mask, faces = faces, depth = depth
         let selection = selectionMask, sky = skyMask, overlay = selecting ? selectionMask : nil
+        let base = erasedPreview ?? photo.preview
         Self.queue.async {
-            var output = Develop.apply(adjustments, to: photo.preview, mask: mask, faces: faces, depth: depth,
+            var output = Develop.apply(adjustments, to: base, mask: mask, faces: faces, depth: depth,
                                        selection: selection, sky: sky, scale: photo.previewScale)
             if let overlay {
                 // Mientras se selecciona, la zona elegida se tiñe de naranja.
@@ -301,6 +316,59 @@ final class EditorModel: ObservableObject {
         if panel.runModal() == .OK, let url = panel.url { adjustments.skyReplacement = url.path }
     }
 
+    // MARK: Borrar objetos (LaMa)
+
+    private var erasingJob = 0
+
+    private func updateErased() {
+        guard let photo else { return }
+        let strokes = adjustments.erase
+        guard !strokes.isEmpty, eraseInstalled else { erasedPreview = nil; scheduleRender(); return }
+        erasingJob += 1
+        let job = erasingJob
+        busy = "Borrando…"
+        Self.queue.async {
+            let erased = EraseModel.inpaint(photo.preview, strokes: strokes, context: Self.context)
+            DispatchQueue.main.async {
+                guard self.photo === photo, job == self.erasingJob else { return }
+                self.busy = nil
+                self.erasedPreview = erased
+                self.scheduleRender()
+            }
+        }
+    }
+
+    /// Un trazo terminado (puntos de 0 a 1, origen abajo a la izquierda).
+    func addEraseStroke(_ points: [SelectionPoint]) {
+        guard !points.isEmpty else { return }
+        adjustments.erase.append(EraseStroke(points: points, radius: brushSize / 100 / 2))
+    }
+
+    func undoEraseStroke() { if !adjustments.erase.isEmpty { adjustments.erase.removeLast() } }
+    func clearErase() { adjustments.erase = [] }
+
+    func installEraseModel() {
+        busy = "Descargando el modelo de borrado… 0 %"
+        Self.queue.async {
+            let result = Result {
+                try EraseModel.install { progress in
+                    DispatchQueue.main.async { self.busy = "Descargando el modelo de borrado… \(Int(progress * 100)) %" }
+                }
+            }
+            DispatchQueue.main.async {
+                self.busy = nil
+                switch result {
+                case .success:
+                    self.eraseInstalled = true
+                    self.status = "Modelo de borrado instalado"
+                    self.updateErased()
+                case .failure(let error):
+                    self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
     func straightenHorizon() {
         guard let photo else { return }
         busy = "Buscando el horizonte…"
@@ -434,7 +502,11 @@ enum EditStore {
 
     static func load(for url: URL) -> Adjustments? { all[url.path] }
 
+    /// En el modo de captura (pruebas) no se guarda nada, para no tocar las ediciones de las fotos.
+    static var readOnly = false
+
     static func save(_ adjustments: Adjustments, for url: URL) {
+        guard !readOnly else { return }
         all[url.path] = adjustments == .neutral ? nil : adjustments
         try? JSONEncoder().encode(all).write(to: file, options: .atomic)
     }

@@ -50,6 +50,38 @@ if arguments.contains("--profundidad") {
     exit(0)
 }
 
+if arguments.contains("--borrar") {
+    // Descarga LaMa si falta y muestra sus entradas y salidas.
+    if !EraseModel.isInstalled {
+        var last = -1
+        do {
+            try EraseModel.install { p in
+                let percent = Int(p * 100)
+                if percent / 10 != last / 10 { last = percent; print("Descargando… \(percent) %") }
+            }
+        } catch {
+            print("Error: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+    print(EraseModel.remote.describe())
+    // Revela --borrar foto salida.jpg x,y,radio …: borra círculos (0…1, origen abajo a la izquierda).
+    if let index = arguments.firstIndex(of: "--borrar"), arguments.count > index + 3,
+       let photo = try? Photo(url: URL(fileURLWithPath: arguments[index + 1])), let full = photo.fullImage() {
+        let strokes = arguments[(index + 3)...].map { arg -> EraseStroke in
+            let v = arg.split(separator: ",").compactMap { Double($0) }
+            return EraseStroke(points: [SelectionPoint(x: v[0], y: v[1])], radius: v[2])
+        }
+        let context = CIContext()
+        let start = Date()
+        guard let result = EraseModel.inpaint(full, strokes: strokes, context: context) else { print("No se pudo borrar"); exit(1) }
+        try? context.writeJPEGRepresentation(of: result, to: URL(fileURLWithPath: arguments[index + 2]),
+                                             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        print(String(format: "Borrado en %.1f s", Date().timeIntervalSince(start)))
+    }
+    exit(0)
+}
+
 if arguments.contains("--seleccion") {
     // Descarga SAM 2.1 si falta y muestra entradas y salidas de sus tres partes.
     if !SegmentModel.isInstalled {
@@ -92,17 +124,24 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
     // Dibuja la ventana en un PNG para revisar el diseño: Revela --captura salida.png [foto]
     MainActor.assumeIsolated {
         _ = NSApplication.shared
+        EditStore.readOnly = true
         let model = EditorModel()
         if arguments.count > index + 2 {
             model.open(URL(fileURLWithPath: arguments[index + 2]))
             RunLoop.main.run(until: Date().addingTimeInterval(2))
             model.adjustments.vibrance = 30
             model.adjustments.look = "cine"
-            model.adjustments.skyReplacement = "nubes"
-            model.adjustments.selection = [SelectionPoint(x: 0.46, y: 0.42)]
-            model.selecting = true
+            if arguments.contains("--con-borrado") {
+                model.adjustments.erase = [EraseStroke(points: [SelectionPoint(x: 0.54, y: 0.345), SelectionPoint(x: 0.56, y: 0.345)],
+                                                       radius: 0.02)]
+                model.erasing = true
+            } else {
+                model.adjustments.skyReplacement = "nubes"
+                model.adjustments.selection = [SelectionPoint(x: 0.46, y: 0.42)]
+                model.selecting = true
+            }
         }
-        RunLoop.main.run(until: Date().addingTimeInterval(3))
+        RunLoop.main.run(until: Date().addingTimeInterval(arguments.contains("--con-borrado") ? 12 : 3))
         let view = NSHostingView(rootView: EditorView(model: model))
         view.appearance = NSAppearance(named: .darkAqua)
         view.frame = NSRect(x: 0, y: 0, width: 1280, height: 800)
