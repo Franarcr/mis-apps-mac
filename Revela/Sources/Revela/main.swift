@@ -56,7 +56,8 @@ if arguments.contains("--profundidad") {
 if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
     // Exporta una foto con sus ajustes guardados en Revela (sin cambiarlos): Revela --revelar foto salida.jpg
     let url = URL(fileURLWithPath: arguments[i + 1])
-    guard let photo = try? Photo(url: url), var a = EditStore.load(for: url) else { print("Sin ajustes guardados"); exit(1) }
+    guard let photo = try? Photo(url: url),
+          var a = EditStore.load(for: url) ?? (arguments.contains("--luz-auto") ? Adjustments() : nil) else { print("Sin ajustes guardados"); exit(1) }
     // --quitar a,b,…: prueba sin algunos ajustes (agua, look, auto, realce, luz) para aislar un problema.
     if let q = arguments.firstIndex(of: "--quitar"), arguments.count > q + 1 {
         for name in arguments[q + 1].split(separator: ",") {
@@ -74,6 +75,15 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
     }
     if let h = arguments.firstIndex(of: "--bruma"), arguments.count > h + 1 { a.skyHaze = Double(arguments[h + 1]) ?? 0 }
     if let h = arguments.firstIndex(of: "--cielo"), arguments.count > h + 1 { a.skyReplacement = arguments[h + 1]; a.skyAmount = 100 }
+    if arguments.contains("--luz-auto") {
+        // Luz automática medida en la vista previa (sin las máscaras de IA, que calcula la exportación).
+        let ctx = CIContext()
+        let auto = AutoLight.adjust(a, render: { Develop.apply($0, to: photo.preview, mask: nil, scale: photo.previewScale) }, context: ctx)
+        a.exposure = auto.exposure; a.contrast = auto.contrast; a.highlights = auto.highlights
+        a.shadows = auto.shadows; a.whites = auto.whites; a.blacks = auto.blacks
+        print(String(format: "Luz automática: exposición %+.2f, contraste %.0f, luces %.0f, sombras %.0f, blancos %.0f, negros %.0f",
+                     a.exposure, a.contrast, a.highlights, a.shadows, a.whites, a.blacks))
+    }
     if let h = arguments.firstIndex(of: "--neblina"), arguments.count > h + 1 { a.dehaze = Double(arguments[h + 1]) ?? 0 }
     if let h = arguments.firstIndex(of: "--reiluminar"), arguments.count > h + 1 { a.relight = Double(arguments[h + 1]) ?? 0 }
     // --agua x,y tono reflejo luz: prueba los ajustes de agua sin guardarlos.

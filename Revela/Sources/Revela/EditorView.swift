@@ -176,6 +176,16 @@ struct EditorView: View {
                     slider("Dientes", \.teeth, 0...100)
                 }
                 section("Luz", icon: "sun.max") {
+                    HStack {
+                        Button {
+                            model.autoLight()
+                        } label: {
+                            Label(model.autoLighting ? "Calculando…" : "Automático", systemImage: "wand.and.stars")
+                        }
+                        .disabled(model.autoLighting || model.photo == nil)
+                        .help("Mide la foto y ajusta exposición, contraste, luces, sombras, blancos y negros como base de revelado")
+                        Spacer()
+                    }
                     slider("Exposición", \.exposure, -3...3, format: "%+.2f")
                     slider("Contraste", \.contrast, -100...100)
                     slider("Luces", \.highlights, -100...100)

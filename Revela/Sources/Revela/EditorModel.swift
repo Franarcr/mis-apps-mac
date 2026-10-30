@@ -180,6 +180,30 @@ final class EditorModel: ObservableObject {
         }
     }
 
+    /// «Automático» de Luz: corrige los seis controles midiendo la foto revelada con el resto de ajustes.
+    @Published var autoLighting = false
+    func autoLight() {
+        guard let photo, !autoLighting else { return }
+        autoLighting = true
+        let start = adjustments, mask = mask, faces = faces, depth = depth
+        let selection = selectionMask, sky = skyMask, water = waterMask
+        let base = erasedPreview ?? photo.preview
+        Self.queue.async {
+            let result = AutoLight.adjust(start, render: { a in
+                Develop.apply(a, to: base, mask: mask, faces: faces, depth: depth, selection: selection, sky: sky,
+                              water: water, scale: photo.previewScale)
+            }, context: Self.context)
+            DispatchQueue.main.async {
+                self.autoLighting = false
+                // Solo cambia la sección Luz (si mientras tanto se tocó otra cosa, se respeta).
+                var a = self.adjustments
+                a.exposure = result.exposure; a.contrast = result.contrast; a.highlights = result.highlights
+                a.shadows = result.shadows; a.whites = result.whites; a.blacks = result.blacks
+                self.adjustments = a
+            }
+        }
+    }
+
     // MARK: IA
 
     private func computeMask() {

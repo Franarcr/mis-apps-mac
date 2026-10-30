@@ -5,7 +5,7 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
 ## Qué hace
 
 - **Abre** JPEG, HEIC, PNG, TIFF y RAW de cámara (Canon, Nikon, Sony, Fuji, DNG… los que admite macOS). Arrastra la foto a la ventana o al icono del Dock, o usa ⌘O.
-- **Luz:** exposición, contraste, luces, sombras, blancos y negros.
+- **Luz:** exposición, contraste, luces, sombras, blancos y negros. **Automático** da una base de revelado: mide el histograma de la foto (ya con el resto de ajustes) y mueve esos seis controles por etapas, como se haría a mano: exposición medida en el paisaje o las personas (un cielo grande o una pared blanca no la engañan) y subida si a la foto le faltan blancos; luces recuperadas solo si se queman; sombras abiertas si se empastan; blancos y negros de punta a punta; y un toque de contraste. Luego se puede retocar cada control.
 - **Color:** temperatura, tinte, intensidad y saturación.
 - **Detalle:** claridad (contraste local), nitidez y viñeta.
 - **Looks:** Cine, Cálido, Frío, Película, Vintage, Cromo, Instantánea y dos de blanco y negro, con intensidad ajustable. **Importar LUT .cube** añade los tuyos (los de Lightroom, DaVinci o cámaras de cine).
@@ -46,7 +46,7 @@ Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativ
 # Descarga LaMa (si falta); con foto, borra círculos x,y,radio (de 0 a 1, origen abajo a la izquierda)
 /Applications/Revela.app/Contents/MacOS/Revela --borrar [foto salida.jpg 0.55,0.35,0.02 …]
 # Exporta una foto con sus ajustes guardados (sin cambiarlos); --agua prueba el agua: x,y tono reflejo luz
-/Applications/Revela.app/Contents/MacOS/Revela --revelar foto salida.jpg [--previa] [--cielo nubes|ruta] [--bruma 40] [--neblina 50] [--reiluminar 80] [--agua 0.75,0.2 60 30 0] [--quitar agua,look,auto,realce,luz,intensidad,borrado]
+/Applications/Revela.app/Contents/MacOS/Revela --revelar foto salida.jpg [--previa] [--luz-auto] [--cielo nubes|ruta] [--bruma 40] [--neblina 50] [--reiluminar 80] [--agua 0.75,0.2 60 30 0] [--quitar agua,look,auto,realce,luz,intensidad,borrado]
 # Descarga Real-ESRGAN (si falta); con foto, amplía un recorte en píxeles y lo compara con una ampliación normal
 /Applications/Revela.app/Contents/MacOS/Revela --ampliar [foto prefijo 4 x,y,ancho,alto]
 ```
