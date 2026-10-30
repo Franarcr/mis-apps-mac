@@ -106,10 +106,21 @@ struct EditorView: View {
                     }
                     slider("Enderezar", \.straighten, -15...15, format: "%.1f°")
                     slider("Desenfocar fondo", \.backgroundBlur, 0...100)
+                    if model.depthInstalled {
+                        slider("Desenfoque de lente", \.lensBlur, 0...100)
+                    } else {
+                        Button("Descargar desenfoque de lente (50 MB)…") { model.installDepthModel() }
+                            .help("Modelo Depth Anything V2 de Apple: calcula la distancia de cada punto de la foto.")
+                    }
                     slider("Luz del sujeto", \.subjectLight, -100...100)
                     slider("Luz del fondo", \.backgroundLight, -100...100)
                     Text("Usa la IA de macOS, sin internet: detecta personas, animales y objetos principales.")
                         .font(.caption2).foregroundStyle(.secondary)
+                }
+                section("Retrato", icon: "face.smiling") {
+                    slider("Suavizar piel", \.skinSmoothing, 0...100)
+                    slider("Ojos", \.eyes, 0...100)
+                    slider("Dientes", \.teeth, 0...100)
                 }
                 section("Luz", icon: "sun.max") {
                     slider("Exposición", \.exposure, -3...3, format: "%+.2f")

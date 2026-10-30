@@ -104,8 +104,10 @@ enum Exporter {
     static func export(_ photo: Photo, adjustments: Adjustments, to url: URL, format: Format, quality: Double,
                        context: CIContext) throws {
         guard let full = photo.fullImage() else { throw Photo.Failure.unreadable(photo.url.lastPathComponent) }
-        let mask = adjustments.usesSubjectMask ? Intelligence.subjectMask(for: full, context: context) : nil
-        let output = Develop.apply(adjustments, to: full, mask: mask, scale: 1)
+        let mask = adjustments.usesSubjectMask || adjustments.usesDepth ? Intelligence.subjectMask(for: full, context: context) : nil
+        let faces = adjustments.usesFaces ? FaceMasks.detect(in: full, context: context) : nil
+        let depth = adjustments.usesDepth ? DepthInfo.compute(for: full, subject: mask, context: context) : nil
+        let output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth, scale: 1)
         let space = CGColorSpace(name: CGColorSpace.displayP3)!
         let options: [CIImageRepresentationOption: Any] = [
             CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality,

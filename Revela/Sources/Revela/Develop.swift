@@ -29,8 +29,32 @@ struct Adjustments: Codable, Equatable {
     var backgroundBlur: Double = 0  // 0…100
     var subjectLight: Double = 0    // -100…100
     var backgroundLight: Double = 0 // -100…100
+    var lensBlur: Double = 0        // 0…100, según la profundidad
+    // Retrato
+    var skinSmoothing: Double = 0   // 0…100
+    var eyes: Double = 0            // 0…100
+    var teeth: Double = 0           // 0…100
 
     var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
+    var usesFaces: Bool { skinSmoothing > 0 || eyes > 0 || teeth > 0 }
+    var usesDepth: Bool { lensBlur > 0 }
+
+    init() {}
+
+    // Los ajustes guardados antes de añadir un control nuevo se leen con ese control a cero.
+    init(from decoder: Decoder) throws {
+        self.init()
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func read(_ key: CodingKeys, _ value: inout Double) { if let v = try? c.decode(Double.self, forKey: key) { value = v } }
+        read(.exposure, &exposure); read(.contrast, &contrast); read(.highlights, &highlights); read(.shadows, &shadows)
+        read(.whites, &whites); read(.blacks, &blacks); read(.temperature, &temperature); read(.tint, &tint)
+        read(.vibrance, &vibrance); read(.saturation, &saturation); read(.clarity, &clarity); read(.sharpness, &sharpness)
+        read(.vignette, &vignette); read(.lookAmount, &lookAmount); read(.straighten, &straighten)
+        read(.backgroundBlur, &backgroundBlur); read(.subjectLight, &subjectLight); read(.backgroundLight, &backgroundLight)
+        read(.lensBlur, &lensBlur); read(.skinSmoothing, &skinSmoothing); read(.eyes, &eyes); read(.teeth, &teeth)
+        look = try? c.decode(String.self, forKey: .look)
+        autoEnhance = (try? c.decode(Bool.self, forKey: .autoEnhance)) ?? false
+    }
     static let neutral = Adjustments()
 }
 
@@ -38,7 +62,8 @@ struct Adjustments: Codable, Equatable {
 enum Develop {
     /// `mask`: máscara del sujeto (blanco = sujeto) del mismo tamaño que `image`, si hace falta.
     /// `scale`: tamaño relativo a la foto completa (para que radios y texturas se vean igual en la vista previa).
-    static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage?, scale: Double) -> CIImage {
+    static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage?, faces: FaceMasks? = nil,
+                      depth: DepthInfo? = nil, scale: Double) -> CIImage {
         var img = image
         let extent = image.extent
 
@@ -47,6 +72,13 @@ enum Develop {
                 filter.setValue(img, forKey: kCIInputImageKey)
                 img = filter.outputImage ?? img
             }
+        }
+
+        // Retrato: antes que el color, para que el retoque se funda con el resto.
+        if let faces {
+            if a.skinSmoothing > 0 { img = Retouch.smoothSkin(img, masks: faces, amount: a.skinSmoothing, scale: scale) }
+            if a.eyes > 0 { img = Retouch.brightenEyes(img, masks: faces, amount: a.eyes) }
+            if a.teeth > 0 { img = Retouch.whitenTeeth(img, masks: faces, amount: a.teeth) }
         }
 
         // Luz del sujeto y del fondo (con la máscara de la IA), antes del resto para que el color se aplique igual.
@@ -115,10 +147,12 @@ enum Develop {
         }
 
         if let mask, a.backgroundBlur > 0 {
-            let blurred = img.clampedToExtent()
-                .applyingGaussianBlur(sigma: a.backgroundBlur / 100 * 30 * scale)
-                .cropped(to: img.extent)
+            let blurred = blurBehind(img, subject: mask, sigma: a.backgroundBlur / 100 * 30 * scale)
             img = blend(img, over: blurred, mask: mask)
+        }
+
+        if let depth, a.lensBlur > 0 {
+            img = lensBlur(img, depth: depth, subject: mask, amount: a.lensBlur, scale: scale)
         }
 
         if a.sharpness > 0 {
@@ -145,6 +179,47 @@ enum Develop {
         }
 
         return img.cropped(to: extent)
+    }
+
+    /// Desenfoca el fondo sin que el color del sujeto se derrame alrededor (sin halo): se desenfoca
+    /// solo lo que no es sujeto y se divide por la máscara desenfocada ("convolución normalizada").
+    static func blurBehind(_ image: CIImage, subject: CIImage, sigma: Double) -> CIImage {
+        let extent = image.extent
+        let background = subject.applyingFilter("CIColorInvert")
+        let onlyBackground = image.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: background])
+        let blurredImage = onlyBackground.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+        let weight = background.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+            .applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.02, y: 0.02, z: 0.02, w: 1)])
+        return blurredImage.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: blurredImage,
+                                                                            kCIInputImageKey: weight])
+    }
+
+    /// Desenfoque de lente: más desenfoque cuanto más lejos (o más cerca) está algo del plano enfocado.
+    static func lensBlur(_ image: CIImage, depth: DepthInfo, subject: CIImage?, amount: Double, scale: Double) -> CIImage {
+        let f = CGFloat(depth.focus)
+        // Detrás del plano enfocado: (foco − profundidad) × 3. Delante, la mitad.
+        func ramp(_ k: CGFloat, _ bias: CGFloat) -> CIImage {
+            depth.map.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputBVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 0),
+            ]).applyingFilter("CIColorClamp")
+        }
+        let behind = ramp(-3, f * 3), front = ramp(1.5, -f * 1.5)
+        var blurMask = behind.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: front])
+            .applyingFilter("CIColorClamp")
+        if let subject {
+            // El sujeto siempre queda nítido.
+            let black = CIImage(color: .black).cropped(to: image.extent)
+            blurMask = blend(black, over: blurMask, mask: subject)
+        }
+        let source = subject.map { blend(image, over: blurBehind(image, subject: $0, sigma: 6 * scale), mask: $0) } ?? image
+        let f2 = CIFilter.maskedVariableBlur()
+        f2.inputImage = source.clampedToExtent()
+        f2.mask = blurMask.clampedToExtent()
+        f2.radius = Float(amount / 100 * 30 * scale)
+        let blurred = (f2.outputImage ?? source).cropped(to: image.extent)
+        return subject.map { blend(image, over: blurred, mask: $0) } ?? blurred
     }
 
     static func exposure(_ image: CIImage, ev: Double) -> CIImage {

@@ -11,6 +11,8 @@ final class EditorModel: ObservableObject {
             guard adjustments != oldValue else { return }
             recordUndo(oldValue)
             if adjustments.usesSubjectMask, mask == nil { computeMask() }
+            if adjustments.usesFaces, faces == nil { detectFaces() }
+            if adjustments.usesDepth, depth == nil { computeDepth() }
             scheduleRender()
             saveEdits()
         }
@@ -36,6 +38,11 @@ final class EditorModel: ObservableObject {
 
     private var mask: CIImage?
     private var computingMask = false
+    private var faces: FaceMasks?
+    private var detectingFaces = false
+    private var depth: DepthInfo?
+    private var computingDepth = false
+    @Published private(set) var depthInstalled = DepthModel.isInstalled
     private var rendering = false
     private var renderAgain = false
     private var undoStack: [Adjustments] = []
@@ -65,12 +72,16 @@ final class EditorModel: ObservableObject {
                     self.photo = photo
                     self.original = original
                     self.mask = nil
+                    self.faces = nil
+                    self.depth = nil
                     self.undoStack = []
                     self.restoring = true
                     self.adjustments = EditStore.load(for: url) ?? Adjustments()
                     self.restoring = false
                     self.status = "\(Int(photo.fullSize.width)) × \(Int(photo.fullSize.height))" + (photo.isRAW ? " · RAW" : "")
                     if self.adjustments.usesSubjectMask { self.computeMask() }
+                    if self.adjustments.usesFaces { self.detectFaces() }
+                    if self.adjustments.usesDepth { self.computeDepth() }
                     self.scheduleRender()
                 case .failure(let error):
                     self.status = error.localizedDescription
@@ -85,9 +96,10 @@ final class EditorModel: ObservableObject {
         guard let photo else { return }
         if rendering { renderAgain = true; return }
         rendering = true
-        let adjustments = adjustments, mask = mask
+        let adjustments = adjustments, mask = mask, faces = faces, depth = depth
         Self.queue.async {
-            let output = Develop.apply(adjustments, to: photo.preview, mask: mask, scale: photo.previewScale)
+            let output = Develop.apply(adjustments, to: photo.preview, mask: mask, faces: faces, depth: depth,
+                                       scale: photo.previewScale)
             let image = Self.context.createCGImage(output, from: output.extent)
             DispatchQueue.main.async {
                 self.rendered = image
@@ -115,6 +127,68 @@ final class EditorModel: ObservableObject {
                 self.mask = mask
                 if mask == nil { self.status = "No se encontró un sujeto claro en esta foto." }
                 self.scheduleRender()
+            }
+        }
+    }
+
+    private func detectFaces() {
+        guard let photo, !detectingFaces else { return }
+        detectingFaces = true
+        busy = "Buscando caras…"
+        Self.queue.async {
+            let faces = FaceMasks.detect(in: photo.preview, context: Self.context)
+            DispatchQueue.main.async {
+                self.detectingFaces = false
+                self.busy = nil
+                guard self.photo === photo else { return }
+                self.faces = faces
+                self.status = faces.map { $0.count == 1 ? "1 cara encontrada" : "\($0.count) caras encontradas" }
+                    ?? "No se encontraron caras en esta foto."
+                self.scheduleRender()
+            }
+        }
+    }
+
+    /// Profundidad de la foto (y el sujeto, para saber dónde enfocar).
+    private func computeDepth() {
+        guard let photo, depthInstalled, !computingDepth else { return }
+        computingDepth = true
+        busy = "Calculando la profundidad…"
+        let knownMask = mask
+        Self.queue.async {
+            let mask = knownMask ?? Intelligence.subjectMask(for: photo.preview, context: Self.context)
+            let depth = DepthInfo.compute(for: photo.preview, subject: mask, context: Self.context)
+            DispatchQueue.main.async {
+                self.computingDepth = false
+                self.busy = nil
+                guard self.photo === photo else { return }
+                if self.mask == nil { self.mask = mask }
+                self.depth = depth
+                if depth == nil { self.status = "No se pudo calcular la profundidad de esta foto." }
+                self.scheduleRender()
+            }
+        }
+    }
+
+    /// Descarga el modelo de profundidad (una sola vez, ~50 MB).
+    func installDepthModel() {
+        busy = "Descargando el modelo de profundidad… 0 %"
+        Self.queue.async {
+            let result = Result {
+                try DepthModel.install { progress in
+                    DispatchQueue.main.async { self.busy = "Descargando el modelo de profundidad… \(Int(progress * 100)) %" }
+                }
+            }
+            DispatchQueue.main.async {
+                self.busy = nil
+                switch result {
+                case .success:
+                    self.depthInstalled = true
+                    self.status = "Modelo de profundidad instalado"
+                    if self.adjustments.usesDepth { self.computeDepth() }
+                case .failure(let error):
+                    self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"
+                }
             }
         }
     }

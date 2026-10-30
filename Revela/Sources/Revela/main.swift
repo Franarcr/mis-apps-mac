@@ -10,8 +10,9 @@ if let index = arguments.firstIndex(of: "--prueba"), arguments.count > index + 2
         var a = Adjustments()
         a.exposure = 0.3; a.contrast = 20; a.shadows = 40; a.highlights = -40; a.vibrance = 30; a.clarity = 30
         a.temperature = 10; a.vignette = 25; a.sharpness = 30
-        a.backgroundBlur = 60; a.subjectLight = 25; a.backgroundLight = -20
-        a.look = arguments.count > index + 3 ? arguments[index + 3] : "cine"
+        a.backgroundBlur = arguments.contains("--lente") ? 0 : 60; a.subjectLight = 25; a.backgroundLight = -20
+        if arguments.contains("--lente") { a.lensBlur = 80 }
+        a.look = arguments.count > index + 3 && !arguments[index + 3].hasPrefix("--") ? arguments[index + 3] : "cine"
         a.lookAmount = 70
         let context = CIContext()
         let start = Date()
@@ -24,6 +25,24 @@ if let index = arguments.firstIndex(of: "--prueba"), arguments.count > index + 2
         print("Error: \(error.localizedDescription)")
         exit(1)
     }
+}
+
+if arguments.contains("--profundidad") {
+    // Descarga el modelo de profundidad si falta y muestra sus entradas y salidas.
+    if !DepthModel.isInstalled {
+        var last = -1
+        do {
+            try DepthModel.install { p in
+                let percent = Int(p * 100)
+                if percent / 10 != last / 10 { last = percent; print("Descargando… \(percent) %") }
+            }
+        } catch {
+            print("Error: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+    print(DepthModel.describe())
+    exit(0)
 }
 
 if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 1 {
