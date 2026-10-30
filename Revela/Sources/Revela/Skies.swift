@@ -40,7 +40,7 @@ enum Skies {
             sky = v.outputImage ?? sky
         }
         if a.skyLight != 0 { sky = Develop.exposure(sky, ev: a.skyLight / 100 * 1.2) }
-        // La máscara ya llega ajustada a los bordes de la foto (MaskRefiner): no se difumina más.
+        // La máscara ya llega ajustada a los bordes de la foto (SkyRefiner): no se difumina más.
         return Develop.blend(sky, over: image, mask: mask)
     }
 
