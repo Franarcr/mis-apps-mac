@@ -111,8 +111,12 @@ enum Exporter {
         let mask = adjustments.usesSubjectMask || adjustments.usesDepth ? Intelligence.subjectMask(for: full, context: context) : nil
         let faces = adjustments.usesFaces ? FaceMasks.detect(in: full, context: context) : nil
         let depth = adjustments.usesDepth ? DepthInfo.compute(for: full, subject: mask, context: context) : nil
-        var selection: CIImage?, sky: CIImage?
-        if adjustments.usesSelection || adjustments.usesSky, let embedding = SegmentModel.encode(full, context: context) {
+        var selection: CIImage?, sky: CIImage?, water: CIImage?
+        if adjustments.usesSelection || adjustments.usesSky || adjustments.usesWater,
+           let embedding = SegmentModel.encode(full, context: context) {
+            if adjustments.usesWater {
+                water = SegmentModel.mask(embedding, points: adjustments.water, extent: full.extent)
+            }
             if adjustments.usesSelection {
                 selection = SegmentModel.mask(embedding, points: adjustments.selection, extent: full.extent)
             }
@@ -122,7 +126,7 @@ enum Exporter {
             }
         }
         var output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
-                                   selection: selection, sky: sky, scale: 1)
+                                   selection: selection, sky: sky, water: water, scale: 1)
         if upscale > 1 {
             output = try UpscaleModel.upscale(output, factor: upscale, context: context, progress: progress)
         }

@@ -46,11 +46,17 @@ struct Adjustments: Codable, Equatable {
     var skyReplacement: String?     // cielo incluido o ruta de una foto de cielo
     var skyAmount: Double = 100
 
+    // Agua: dónde se hizo clic y sus ajustes
+    var water: [SelectionPoint] = []
+    var waterTint: Double = 0        // 0…100: color del cielo en el agua
+    var waterReflection: Double = 0  // 0…100
+    var waterLight: Double = 0       // -100…100
     // Borrar objetos (LaMa): trazos del pincel
     var erase: [EraseStroke] = []
 
     var usesSelection: Bool { !selection.isEmpty }
     var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil }
+    var usesWater: Bool { !water.isEmpty }
     var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
     var usesFaces: Bool { skinSmoothing > 0 || eyes > 0 || teeth > 0 }
     var usesDepth: Bool { lensBlur > 0 }
@@ -72,6 +78,8 @@ struct Adjustments: Codable, Equatable {
         read(.selTemperature, &selTemperature); read(.skyLight, &skyLight); read(.skyEnhance, &skyEnhance); read(.skyAmount, &skyAmount)
         selection = (try? c.decode([SelectionPoint].self, forKey: .selection)) ?? []
         erase = (try? c.decode([EraseStroke].self, forKey: .erase)) ?? []
+        water = (try? c.decode([SelectionPoint].self, forKey: .water)) ?? []
+        read(.waterTint, &waterTint); read(.waterReflection, &waterReflection); read(.waterLight, &waterLight)
         skyReplacement = try? c.decode(String.self, forKey: .skyReplacement)
         look = try? c.decode(String.self, forKey: .look)
         autoEnhance = (try? c.decode(Bool.self, forKey: .autoEnhance)) ?? false
@@ -85,7 +93,7 @@ enum Develop {
     /// `scale`: tamaño relativo a la foto completa (para que radios y texturas se vean igual en la vista previa).
     static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage?, faces: FaceMasks? = nil,
                       depth: DepthInfo? = nil, selection: CIImage? = nil, sky: CIImage? = nil,
-                      scale: Double) -> CIImage {
+                      water: CIImage? = nil, scale: Double) -> CIImage {
         var img = image
         let extent = image.extent
 
@@ -106,6 +114,11 @@ enum Develop {
         // Cielo: se cambia o se realza antes de los ajustes generales, para que todo quede con el mismo tono.
         if let sky, a.usesSky {
             img = Skies.apply(a, to: img, mask: sky)
+        }
+
+        // Agua: después del cielo, para tomar su color (el cambiado, si se cambió).
+        if let water, a.waterTint > 0 || a.waterReflection > 0 || a.waterLight != 0 {
+            img = Water.apply(a, to: img, water: water, sky: sky)
         }
 
         // Ajustes solo en la zona seleccionada con un clic.

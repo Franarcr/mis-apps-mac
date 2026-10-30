@@ -18,6 +18,7 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
 - **Borrar objetos** (LaMa, licencia Apache 2.0, conversión a Core ML de MLBoy, ~217 MB, se descarga una vez): pulsa *Pincel* y pinta sobre personas, cables, manchas o cualquier cosa; se rellena con lo que debería haber detrás. Solo se procesa un recorte alrededor de lo pintado, así la foto conserva su resolución completa. *Deshacer trazo* y *Quitar todo* lo revierten.
 - **Selección con un clic** (SAM 2.1 de Apple, licencia Apache 2.0, ~94 MB, se descarga una vez): pulsa *Seleccionar* y haz clic en una persona, el agua, un edificio… (⌥ clic quita una zona). Luego ajusta solo esa zona: exposición, contraste, saturación y temperatura.
 - **Cielo** (con el mismo modelo): *Luz del cielo* y *Realzar cielo* para el cielo de la foto, o **Cambiar cielo** por uno de los incluidos (despejado, con nubes, atardecer, hora dorada, tormenta) o por una foto de cielo tuya.
+- **Agua** (con el mismo modelo): *Marcar el agua* y un clic en el mar, lago o río. Luego **Color del cielo en el agua** (toma el color medio del cielo, el cambiado si lo cambiaste, y conserva olas y brillos), **Reflejo del cielo** y **Luz del agua**.
 - **Retrato** (detección de caras de macOS): **suavizar piel** (conserva textura), **ojos** más claros y nítidos y **dientes** más blancos, solo en las zonas de cada cara.
 - **Antes / después** (botón *Antes* o la tecla `\`), **Deshacer** (⌘Z) y **Restablecer** (⇧⌘R). Doble clic en el nombre de un control lo devuelve a cero.
 - **Exportar** (⌘E) en JPEG, HEIC, PNG o TIFF de 16 bits, a resolución completa.
@@ -41,6 +42,8 @@ Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativ
 /Applications/Revela.app/Contents/MacOS/Revela --prueba foto.jpg salida.jpg --cielo atardecer
 # Descarga LaMa (si falta); con foto, borra círculos x,y,radio (de 0 a 1, origen abajo a la izquierda)
 /Applications/Revela.app/Contents/MacOS/Revela --borrar [foto salida.jpg 0.55,0.35,0.02 …]
+# Exporta una foto con sus ajustes guardados (sin cambiarlos); --agua prueba el agua: x,y tono reflejo luz
+/Applications/Revela.app/Contents/MacOS/Revela --revelar foto salida.jpg [--agua 0.75,0.2 60 30 0]
 # Descarga Real-ESRGAN (si falta); con foto, amplía un recorte en píxeles y lo compara con una ampliación normal
 /Applications/Revela.app/Contents/MacOS/Revela --ampliar [foto prefijo 4 x,y,ancho,alto]
 ```

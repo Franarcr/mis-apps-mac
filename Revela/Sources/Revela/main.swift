@@ -54,7 +54,15 @@ if arguments.contains("--profundidad") {
 if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
     // Exporta una foto con sus ajustes guardados en Revela (sin cambiarlos): Revela --revelar foto salida.jpg
     let url = URL(fileURLWithPath: arguments[i + 1])
-    guard let photo = try? Photo(url: url), let a = EditStore.load(for: url) else { print("Sin ajustes guardados"); exit(1) }
+    guard let photo = try? Photo(url: url), var a = EditStore.load(for: url) else { print("Sin ajustes guardados"); exit(1) }
+    // --agua x,y tono reflejo luz: prueba los ajustes de agua sin guardarlos.
+    if let w = arguments.firstIndex(of: "--agua"), arguments.count > w + 4 {
+        let v = arguments[w + 1].split(separator: ",").compactMap { Double($0) }
+        a.water = [SelectionPoint(x: v[0], y: v[1])]
+        a.waterTint = Double(arguments[w + 2]) ?? 0
+        a.waterReflection = Double(arguments[w + 3]) ?? 0
+        a.waterLight = Double(arguments[w + 4]) ?? 0
+    }
     let start = Date()
     try? Exporter.export(photo, adjustments: a, to: URL(fileURLWithPath: arguments[i + 2]), format: .jpeg, quality: 0.92, context: CIContext())
     print(String(format: "Revelada en %.1f s", Date().timeIntervalSince(start)))

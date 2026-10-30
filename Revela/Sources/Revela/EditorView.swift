@@ -30,9 +30,10 @@ struct EditorView: View {
                         .overlay(strokeOverlay(in: rect.size))
                         .contentShape(Rectangle())
                         .gesture(SpatialTapGesture().onEnded { tap in
-                            guard model.selecting else { return }
-                            model.addSelectionPoint(x: tap.location.x / rect.width, y: 1 - tap.location.y / rect.height,
-                                                    include: !NSEvent.modifierFlags.contains(.option))
+                            let point = SelectionPoint(x: tap.location.x / rect.width, y: 1 - tap.location.y / rect.height,
+                                                       include: !NSEvent.modifierFlags.contains(.option))
+                            if model.selecting { model.adjustments.selection.append(point) }
+                            if model.markingWater { model.adjustments.water.append(point) }
                         })
                         .simultaneousGesture(DragGesture(minimumDistance: 0)
                             .onChanged { drag in
@@ -65,6 +66,12 @@ struct EditorView: View {
                         .font(.callout.weight(.medium))
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(Color.red.opacity(0.85), in: Capsule())
+                }
+                if model.markingWater {
+                    Text("Haz clic en el agua (mar, lago, río…) · ⌥ clic para quitar una zona")
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.85), in: Capsule())
                 }
                 if model.selecting {
                     Text("Haz clic en lo que quieras seleccionar · ⌥ clic para quitar una zona")
@@ -155,6 +162,7 @@ struct EditorView: View {
                 section("Borrar objetos", icon: "eraser") { eraseControls }
                 section("Selección con un clic", icon: "hand.point.up.left") { selectionControls }
                 section("Cielo", icon: "cloud.sun") { skyControls }
+                section("Agua", icon: "water.waves") { waterControls }
                 section("Retrato", icon: "face.smiling") {
                     slider("Suavizar piel", \.skinSmoothing, 0...100)
                     slider("Ojos", \.eyes, 0...100)
@@ -305,6 +313,27 @@ struct EditorView: View {
             }
             Button("Usar una foto de cielo…") { model.chooseSkyPhoto() }
             if model.adjustments.skyReplacement != nil { slider("Intensidad del cielo", \.skyAmount, 0...100) }
+        } else {
+            downloadSegmentButton
+        }
+    }
+
+    @ViewBuilder private var waterControls: some View {
+        if model.segmentInstalled {
+            HStack {
+                Toggle(model.markingWater ? "Marcando…" : "Marcar el agua", isOn: $model.markingWater)
+                    .toggleStyle(.button)
+                    .tint(.blue)
+                if !model.adjustments.water.isEmpty { Button("Quitar") { model.clearWater() } }
+            }
+            if model.adjustments.water.isEmpty {
+                Text("Pulsa «Marcar el agua» y haz clic en el mar, el lago o el río para que haga juego con el cielo.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            } else {
+                slider("Color del cielo en el agua", \.waterTint, 0...100)
+                slider("Reflejo del cielo", \.waterReflection, 0...100)
+                slider("Luz del agua", \.waterLight, -100...100)
+            }
         } else {
             downloadSegmentButton
         }

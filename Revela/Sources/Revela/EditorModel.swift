@@ -15,6 +15,7 @@ final class EditorModel: ObservableObject {
             if adjustments.usesDepth, depth == nil { computeDepth() }
             if adjustments.selection != oldValue.selection { updateSelectionMask() }
             if adjustments.erase != oldValue.erase { updateErased() }
+            if adjustments.water != oldValue.water { updateWaterMask() }
             if adjustments.usesSky, skyMask == nil { computeSkyMask() }
             scheduleRender()
             saveEdits()
@@ -54,10 +55,15 @@ final class EditorModel: ObservableObject {
     @Published private(set) var segmentInstalled = SegmentModel.isInstalled
     /// Modo «seleccionar con un clic»: los clics en la foto añaden puntos y se ve la zona elegida.
     @Published var selecting = false {
-        didSet { if selecting { erasing = false }; scheduleRender() }
+        didSet { if selecting { erasing = false; markingWater = false }; scheduleRender() }
     }
     /// Modo «borrar objetos»: arrastrar sobre la foto pinta lo que se borra.
-    @Published var erasing = false { didSet { if erasing { selecting = false } } }
+    @Published var erasing = false { didSet { if erasing { selecting = false; markingWater = false } } }
+    /// Modo «marcar el agua»: los clics en la foto indican dónde está el agua.
+    @Published var markingWater = false {
+        didSet { if markingWater { selecting = false; erasing = false }; scheduleRender() }
+    }
+    private var waterMask: CIImage?
     @Published var brushSize = 3.0   // % del ancho de la foto
     /// Trazo en curso, en puntos de la vista (mientras se arrastra).
     @Published var currentStroke: [CGPoint] = []
@@ -102,6 +108,8 @@ final class EditorModel: ObservableObject {
                     self.selectionMask = nil
                     self.skyMask = nil
                     self.erasedPreview = nil
+                    self.waterMask = nil
+                    self.markingWater = false
                     self.selecting = false
                     self.erasing = false
                     self.undoStack = []
@@ -115,6 +123,7 @@ final class EditorModel: ObservableObject {
                     if self.adjustments.usesSelection { self.updateSelectionMask() }
                     if self.adjustments.usesSky { self.computeSkyMask() }
                     if !self.adjustments.erase.isEmpty { self.updateErased() }
+                    if self.adjustments.usesWater { self.updateWaterMask() }
                     self.scheduleRender()
                 case .failure(let error):
                     self.status = error.localizedDescription
@@ -130,14 +139,16 @@ final class EditorModel: ObservableObject {
         if rendering { renderAgain = true; return }
         rendering = true
         let adjustments = adjustments, mask = mask, faces = faces, depth = depth
-        let selection = selectionMask, sky = skyMask, overlay = selecting ? selectionMask : nil
+        let selection = selectionMask, sky = skyMask, water = waterMask
+        let overlay = selecting ? selectionMask : markingWater ? waterMask : nil
+        let overlayColor = markingWater ? CIColor(red: 0.1, green: 0.6, blue: 1, alpha: 0.45) : CIColor(red: 1, green: 0.45, blue: 0.1, alpha: 0.45)
         let base = erasedPreview ?? photo.preview
         Self.queue.async {
             var output = Develop.apply(adjustments, to: base, mask: mask, faces: faces, depth: depth,
-                                       selection: selection, sky: sky, scale: photo.previewScale)
+                                       selection: selection, sky: sky, water: water, scale: photo.previewScale)
             if let overlay {
                 // Mientras se selecciona, la zona elegida se tiñe de naranja.
-                let tint = CIImage(color: CIColor(red: 1, green: 0.45, blue: 0.1, alpha: 0.45)).cropped(to: output.extent)
+                let tint = CIImage(color: overlayColor).cropped(to: output.extent)
                 let tinted = tint.composited(over: output)
                 output = Develop.blend(tinted, over: output, mask: overlay)
             }
@@ -285,6 +296,24 @@ final class EditorModel: ObservableObject {
     /// Clic en la foto (0…1, origen abajo a la izquierda). Con ⌥ quita esa zona de la selección.
     func addSelectionPoint(x: Double, y: Double, include: Bool) {
         adjustments.selection.append(SelectionPoint(x: x, y: y, include: include))
+    }
+
+    private func updateWaterMask() {
+        let points = adjustments.water
+        guard !points.isEmpty else { waterMask = nil; scheduleRender(); return }
+        withEmbedding { embedding, photo in
+            let mask = SegmentModel.mask(embedding, points: points, extent: photo.preview.extent)
+            DispatchQueue.main.async {
+                guard self.photo === photo, self.adjustments.water == points else { return }
+                self.waterMask = mask
+                self.scheduleRender()
+            }
+        }
+    }
+
+    func clearWater() {
+        adjustments.water = []
+        adjustments.waterTint = 0; adjustments.waterReflection = 0; adjustments.waterLight = 0
     }
 
     func clearSelection() {
