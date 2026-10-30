@@ -60,14 +60,19 @@ extension SegmentModel {
     /// Selección hecha con clics: cada clic que suma da su propia máscara (con los clics que restan) y se
     /// juntan. Si se le pasan a SAM a la vez clics en cosas distintas (agua y cielo, por ejemplo), busca
     /// un solo objeto que lo abarque todo, se confunde y devuelve una máscara a cuadros.
-    static func objectMask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect) -> CIImage? {
+    /// `guide`: la foto; para el agua, el borde se ajusta por color (llega al agua entre plantas y orillas).
+    static func objectMask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect, guide: CIImage? = nil) -> CIImage? {
         let negatives = points.filter { !$0.include }
         let masks = points.filter(\.include).compactMap { mask(embedding, points: [$0] + negatives, extent: extent) }
         guard var union = masks.first else { return nil }
         for other in masks.dropFirst() {
             union = union.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: other])
         }
-        return union.cropped(to: extent)
+        union = union.cropped(to: extent)
+        guard let guide else { return union }
+        // El agua tiene más textura que el cielo (olas, gotas): se admite algo más de diferencia de color.
+        return EdgeRefiner.refine(union, photo: guide.cropped(to: extent), cell: extent.width / 256,
+                                  similar: 0.03, different: 0.08, reach: 9, greenWeight: 0.6, rejectGreener: true)
     }
 
     /// `guide`: la foto; para el cielo, el borde de la máscara se ajusta al color de la foto
@@ -117,7 +122,7 @@ extension SegmentModel {
             ])
             .cropped(to: extent)
         guard let guide else { return coarse }
-        return SkyRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: extent.width / CGFloat(width))
+        return EdgeRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: extent.width / CGFloat(width))
     }
 
     /// Deja solo las zonas unidas a la fila de arriba (y su borde suave); el resto, a cero.
@@ -159,11 +164,15 @@ extension SegmentModel {
     static let skyPoints = [SelectionPoint(x: 0.5, y: 0.97), SelectionPoint(x: 0.15, y: 0.95), SelectionPoint(x: 0.85, y: 0.95)]
 }
 
-/// Ajusta el borde de la máscara del cielo a la foto. La máscara de SAM (256 × 256) estirada a la foto
-/// completa deja una franja del cielo original alrededor de edificios y árboles. En esa franja se decide
-/// píxel a píxel por el color: es cielo si se parece al color del cielo de esa zona.
-enum SkyRefiner {
-    static func refine(_ coarse: CIImage, photo: CIImage, cell: CGFloat) -> CIImage {
+/// Ajusta el borde de una máscara de cielo o de agua a la foto. La máscara de SAM (256 × 256) estirada a la
+/// foto completa deja una franja sin tocar alrededor de edificios, árboles o plantas, y SAM toma enteros
+/// los objetos con huecos (rejillas, ramas, cañas). En esa franja se decide píxel a píxel por el color:
+/// es cielo (o agua) si se parece al color del cielo (o del agua) de esa zona.
+enum EdgeRefiner {
+    /// `similar`…`different`: diferencia media de color hasta la que es la misma superficie, y desde la que ya no.
+    static func refine(_ coarse: CIImage, photo: CIImage, cell: CGFloat,
+                       similar near: CGFloat = 0.03, different far: CGFloat = 0.09, reach: CGFloat = 6,
+                       greenWeight: CGFloat = 1.0 / 3, rejectGreener: Bool = false) -> CIImage {
         let extent = coarse.extent
         func clamp01(_ x: CIImage) -> CIImage { x.applyingFilter("CIColorClamp").cropped(to: extent) }
         func affine(_ x: CIImage, _ k: CGFloat, _ bias: CGFloat) -> CIImage {
@@ -176,12 +185,12 @@ enum SkyRefiner {
         // Cielo seguro: el interior de la máscara, alejado más de una celda del borde.
         let core = affine(coarse.clampedToExtent()
             .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: cell * 1.5]).cropped(to: extent), 10, -8.5)
-        // Franja dudosa: hasta seis celdas por fuera de la máscara. Tan ancha para llegar al cielo que se ve
-        // por dentro de rejillas y ramas (SAM las toma enteras como objeto); el color protege lo que no es cielo.
+        // Franja dudosa: hasta `reach` celdas por fuera de la máscara. Ancha para llegar al cielo o al agua que se
+        // ve por dentro de rejillas, ramas y cañas (SAM las toma enteras como objeto); el color protege lo demás.
         let band = affine(coarse.clampedToExtent()
-            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: cell * 6]).cropped(to: extent), 4, -1)
-        // Color del cielo en cada zona: media del cielo seguro de alrededor (convolución normalizada).
-        let sigma = Double(cell * 5)
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: cell * reach]).cropped(to: extent), 4, -1)
+        // Color de la superficie en cada zona: media de la zona segura de alrededor (convolución normalizada).
+        let sigma = Double(cell * max(5, reach * 0.8))
         let weighted = photo.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: core])
         let num = weighted.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
         let den = core.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
@@ -189,15 +198,33 @@ enum SkyRefiner {
         let skyColor = den.applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: num])
         // Parecido de cada píxel al color del cielo de su zona (diferencia media de los tres canales).
         let difference = photo.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: skyColor])
-        let third = CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0)
+        // Peso de cada canal en la diferencia; para el agua cuenta más el verde (separa agua gris de plantas).
+        let side = (1 - greenWeight) / 2
+        let third = CIVector(x: side, y: greenWeight, z: side, w: 0)
         // Se suaviza un poco para que el ruido de la foto no deje puntos sueltos.
         let noise = Double(max(1.5, extent.width / 2500))
         let distance = difference.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": third, "inputGVector": third, "inputBVector": third, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
         ]).clampedToExtent().applyingGaussianBlur(sigma: noise).cropped(to: extent)
-        // Hasta 0,03 de diferencia es cielo; a partir de 0,09, no (más estricto deja puntos del cielo viejo).
-        let similar = affine(distance, -1 / 0.06, 0.09 / 0.06)
-        let fine = similar.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: band]).cropped(to: extent)
+        // Para el cielo, hasta 0,03 de diferencia es cielo y desde 0,09 no (más estricto deja puntos del cielo viejo).
+        let similar = affine(distance, -1 / (far - near), far / (far - near))
+        var fine = similar.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: band]).cropped(to: extent)
+        if rejectGreener {
+            // Las plantas en sombra pueden ser tan oscuras como el agua: lo que es más verde que el agua
+            // de su zona (verde − media de rojo y azul) no es agua.
+            let greenness = CIVector(x: -0.5, y: 1, z: -0.5, w: 0)
+            func green(_ x: CIImage) -> CIImage {
+                x.applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": greenness, "inputGVector": greenness, "inputBVector": greenness,
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                ])
+            }
+            // extra = verdor de la foto − verdor del agua de la zona (con signo); si es mayor que 0, deja de ser agua.
+            let extra = green(skyColor).applyingFilter("CISubtractBlendMode", parameters: [kCIInputBackgroundImageKey: green(photo)])
+                .clampedToExtent().applyingGaussianBlur(sigma: noise).cropped(to: extent)
+            let water = affine(extra, -1 / 0.02, 1)
+            fine = fine.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: water]).cropped(to: extent)
+        }
         // El cielo seguro se queda siempre (por si tiene nubes de otro color); en la franja manda el color.
         let merged = clamp01(fine.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: core]))
         // Puntos aislados fuera: un cierre (máximo y luego mínimo) los rellena o los quita, y un borde de 1 px suave.

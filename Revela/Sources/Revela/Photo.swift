@@ -118,7 +118,7 @@ enum Exporter {
         if adjustments.usesSelection || adjustments.usesSky || adjustments.usesWater,
            let embedding = SegmentModel.encode(full, context: context) {
             if adjustments.usesWater {
-                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: full.extent)
+                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: full.extent, guide: full)
             }
             if adjustments.usesSelection {
                 selection = SegmentModel.objectMask(embedding, points: adjustments.selection, extent: full.extent)

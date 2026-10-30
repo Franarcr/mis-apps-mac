@@ -302,7 +302,7 @@ final class EditorModel: ObservableObject {
         let points = adjustments.water
         guard !points.isEmpty else { waterMask = nil; scheduleRender(); return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent)
+            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent, guide: photo.preview)
             DispatchQueue.main.async {
                 guard self.photo === photo, self.adjustments.water == points else { return }
                 self.waterMask = mask
