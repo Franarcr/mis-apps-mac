@@ -3,6 +3,17 @@ import CoreImage.CIFilterBuiltins
 
 /// Agua congruente con el cielo: tono, reflejo y luz, solo dentro de la máscara del agua.
 enum Water {
+    /// 1 donde un píxel tiene el tono del agua de su zona (aunque sea más oscuro o más claro), 0 si es de otro color.
+    private static let toneKernel = CIColorKernel(source: """
+        kernel vec4 tone(__sample g, __sample o) {
+            float lg = max((g.r + g.g + g.b) / 3.0, 0.001);
+            float lo = max((o.r + o.g + o.b) / 3.0, 0.001);
+            vec3 d = abs(g.rgb / lg - o.rgb / lo);
+            float v = clamp(1.0 - (d.r + d.g + d.b) / 3.0 / 0.15, 0.0, 1.0) * clamp((lg / lo - 0.3) / 0.3, 0.0, 1.0);
+            return vec4(v, v, v, 1.0);
+        }
+        """)!
+
     static func apply(_ a: Adjustments, to image: CIImage, water mask: CIImage, sky: CIImage?) -> CIImage {
         let extent = image.extent
         var result = image
@@ -36,7 +47,31 @@ enum Water {
 
         if a.waterLight != 0 { result = Develop.exposure(result, ev: a.waterLight / 100 * 1.2) }
 
-        return Develop.blend(result, over: image, mask: mask)
+        // Junto al agua (bordes de cañas y tallos, que son mezcla de planta y agua), lo que tiene el tono del agua
+        // de la zona cambia en proporción: ×(agua nueva / agua vieja). Así no queda un halo del agua de antes.
+        let r = max(1, extent.width / 300)
+        let small = CGAffineTransform(scaleX: 1.0 / 4, y: 1.0 / 4)
+        let blur = { (x: CIImage) in
+            x.transformed(by: small).clampedToExtent().applyingGaussianBlur(sigma: Double(r / 4))
+                .transformed(by: small.inverted()).cropped(to: extent)
+        }
+        let core = mask.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 5, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 5, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 5, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBiasVector": CIVector(x: -4, y: -4, z: -4, w: 0),
+        ]).applyingFilter("CIColorClamp").cropped(to: extent)
+        let weight = blur(core).applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.001, y: 0.001, z: 0.001, w: 1)])
+        let oldWater = Arith.ratio(blur(Arith.mul(image, core)), weight)
+        let newWater = Arith.ratio(blur(Arith.mul(result, core)), weight)
+        let band = blur(core).applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 4, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 4, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 4, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ]).applyingFilter("CIColorClamp").cropped(to: extent)
+        let sameTone = Self.toneKernel.apply(extent: extent, arguments: [image, oldWater]) ?? image
+        let fringe = Arith.mul(band, sameTone)
+        let relitEdge = Arith.mul(image, Arith.ratio(newWater, oldWater)).applyingFilter("CIColorClamp").cropped(to: extent)
+        let edged = Develop.blend(relitEdge, over: image, mask: fringe)
+        return Develop.blend(result, over: edged, mask: mask)
     }
 
     /// Sin máscara de cielo: se toma como cielo el tercio superior de la foto.

@@ -148,9 +148,13 @@ enum Atmosphere {
     /// Media de `image` ponderada por `weight` (gris).
     private static func average(_ image: CIImage, weight: CIImage) -> [Float]? {
         let extent = image.extent
-        func mean(_ img: CIImage) -> [Float] {
+        // Sobre una copia de unos 512 px: la media es la misma y no obliga a calcular la foto completa.
+        let k = min(1, 512 / max(extent.width, extent.height))
+        let small = CGAffineTransform(scaleX: k, y: k)
+        func mean(_ full: CIImage) -> [Float] {
             var pixel = [Float](repeating: 0, count: 4)
-            let avg = img.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: extent)])
+            let img = full.transformed(by: small)
+            let avg = img.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: img.extent)])
             context.render(avg, toBitmap: &pixel, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
                            format: .RGBAf, colorSpace: nil)
             return pixel

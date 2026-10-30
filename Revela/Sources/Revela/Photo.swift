@@ -44,6 +44,37 @@ final class Photo {
     /// La foto completa (para exportar).
     func fullImage() -> CIImage? { Self.load(url, raw: isRAW, scale: 1) }
 
+    private static let detailContext = CIContext(options: [.cacheIntermediates: false])
+
+    /// Copia al doble de la vista previa (o la original, si es menor), ya calculada: las máscaras del cielo y
+    /// del agua de la vista previa se hacen con ella, porque a 2048 px los huecos de una rejilla o los bordes
+    /// de las cañas son de 1–2 px y la máscara saldría muy distinta de la de la exportación.
+    lazy var detail: CIImage = {
+        let factor = min(1, CGFloat(previewScale) * 2)
+        guard factor > CGFloat(previewScale), let image = Self.load(url, raw: isRAW, scale: factor) else { return preview }
+        let moved = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
+        guard let cg = Self.detailContext.createCGImage(moved, from: moved.extent, format: .RGBAh,
+                                                        colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)) else { return preview }
+        return CIImage(cgImage: cg)
+    }()
+
+    /// Una máscara hecha sobre `detail`, llevada al tamaño de la vista previa y ya calculada (así mover un control
+    /// no la vuelve a calcular).
+    func previewMask(_ mask: CIImage) -> CIImage {
+        var m = mask
+        if detail.extent.width != preview.extent.width {
+            let f = CIFilter.lanczosScaleTransform()
+            f.inputImage = mask
+            f.scale = Float(preview.extent.height / detail.extent.height)
+            f.aspectRatio = Float((preview.extent.width / detail.extent.width) / (preview.extent.height / detail.extent.height))
+            m = (f.outputImage ?? mask).applyingFilter("CIColorClamp")
+        }
+        m = m.cropped(to: preview.extent)
+        guard let cg = Self.detailContext.createCGImage(m, from: preview.extent, format: .RGBAh,
+                                                        colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)) else { return m }
+        return CIImage(cgImage: cg)
+    }
+
     private static func load(_ url: URL, raw: Bool, scale: CGFloat) -> CIImage? {
         if raw, let filter = CIRAWFilter(imageURL: url) {
             filter.scaleFactor = Float(scale)
@@ -101,6 +132,12 @@ enum Exporter {
         var fileExtension: String { ["JPEG": "jpg", "HEIC": "heic", "PNG": "png", "TIFF": "tif"][rawValue]! }
     }
 
+    static func materialize(_ mask: CIImage, context: CIContext) -> CIImage {
+        guard let cg = context.createCGImage(mask, from: mask.extent, format: .RGBAh,
+                                             colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)) else { return mask }
+        return CIImage(cgImage: cg).transformed(by: CGAffineTransform(translationX: mask.extent.minX, y: mask.extent.minY))
+    }
+
     /// `upscale`: 1 (tamaño original), 2 o 4 (con Real-ESRGAN). `progress` informa de la ampliación (0…1).
     static func export(_ photo: Photo, adjustments: Adjustments, to url: URL, format: Format, quality: Double,
                        upscale: Int = 1, usePreview: Bool = false, context: CIContext,
@@ -117,17 +154,28 @@ enum Exporter {
         var selection: CIImage?, sky: CIImage?, water: CIImage?
         if adjustments.usesSelection || adjustments.usesSky || adjustments.usesWater,
            let embedding = SegmentModel.encode(full, context: context) {
+            // En la vista previa, como en el editor: cielo y agua con la copia de detalle, llevados a su tamaño.
+            let guide = usePreview ? photo.detail : full
+            let fit: (CIImage) -> CIImage = usePreview ? photo.previewMask : { $0 }
             if adjustments.usesSky || adjustments.usesWater {
-                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true,
-                                        guide: full)
+                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: guide.extent, connectedToTop: true,
+                                        guide: guide).map(fit)
             }
             if adjustments.usesWater {
-                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: full.extent, guide: full, excluding: sky)
+                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: guide.extent, guide: guide,
+                                                excluding: sky).map(fit)
             }
             if adjustments.usesSelection {
                 selection = SegmentModel.objectMask(embedding, points: adjustments.selection, extent: full.extent)
             }
             if !adjustments.usesSky { sky = nil }
+            // Cada máscara se calcula una sola vez: si no, Core Image repite toda su cadena (desenfoques grandes,
+            // comparaciones de color) en cada trozo de la foto y una exportación tarda minutos.
+            if !usePreview {
+                sky = sky.map { Self.materialize($0, context: context) }
+                water = water.map { Self.materialize($0, context: context) }
+                selection = selection.map { Self.materialize($0, context: context) }
+            }
         }
         var output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
                                    selection: selection, sky: sky, water: water, scale: scale)

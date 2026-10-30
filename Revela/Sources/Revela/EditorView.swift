@@ -56,6 +56,19 @@ struct EditorView: View {
                     Text("Arrastra una foto aquí").font(.title3.weight(.medium))
                     Button("Abrir una foto…") { model.chooseFile() }.buttonStyle(.borderedProminent)
                     Text("JPEG, HEIC, PNG, TIFF y RAW de cámara").font(.caption).foregroundStyle(.secondary)
+                    let recents = model.availableRecents
+                    if !recents.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Recientes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            ForEach(recents.prefix(6), id: \.self) { url in
+                                Button { model.open(url) } label: {
+                                    Label(url.lastPathComponent, systemImage: "photo").lineLimit(1)
+                                }
+                                .buttonStyle(.link)
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
                 }
                 .foregroundStyle(.white.opacity(0.85))
             }
@@ -98,7 +111,24 @@ struct EditorView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Button { model.chooseFile() } label: { Label("Abrir", systemImage: "folder") }
+            Menu {
+                let recents = model.availableRecents
+                if recents.isEmpty {
+                    Text("Sin fotos recientes")
+                } else {
+                    ForEach(recents, id: \.self) { url in
+                        Button(url.lastPathComponent) { model.open(url) }
+                    }
+                    Divider()
+                    Button("Borrar la lista") { model.clearRecents() }
+                }
+            } label: {
+                Label("Abrir", systemImage: "folder")
+            } primaryAction: {
+                model.chooseFile()
+            }
+            .fixedSize()
+            .help("Clic para abrir una foto; la flecha muestra las recientes")
             if model.photo != nil {
                 Button { model.showOriginal.toggle() } label: {
                     Label(model.showOriginal ? "Viendo el original" : "Antes", systemImage: "rectangle.split.2x1")
@@ -168,8 +198,8 @@ struct EditorView: View {
                 }
                 section("Borrar objetos", icon: "eraser") { eraseControls }
                 section("Selección con un clic", icon: "hand.point.up.left") { selectionControls }
-                section("Cielo", icon: "cloud.sun") { skyControls }
-                section("Agua", icon: "water.waves") { waterControls }
+                section("Cielo", icon: "cloud.sun", experimental: true) { skyControls }
+                section("Agua", icon: "water.waves", experimental: true) { waterControls }
                 section("Retrato", icon: "face.smiling") {
                     slider("Suavizar piel", \.skinSmoothing, 0...100)
                     slider("Ojos", \.eyes, 0...100)
@@ -435,7 +465,9 @@ struct EditorView: View {
 
     // MARK: Piezas
 
-    private func section<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
+    /// `experimental`: herramientas que todavía no dan buen resultado en todas las fotos (título en rojo).
+    private func section<Content: View>(_ title: String, icon: String, experimental: Bool = false,
+                                        @ViewBuilder content: () -> Content) -> some View {
         let collapsed = model.collapsedSections.contains(title)
         return VStack(alignment: .leading, spacing: 10) {
             Button {
@@ -450,16 +482,23 @@ struct EditorView: View {
             } label: {
                 HStack(spacing: 6) {
                     Label(title.uppercased(), systemImage: icon)
+                    if experimental {
+                        Text("EXPERIMENTAL")
+                            .font(.system(size: 8, weight: .heavy))
+                            .padding(.horizontal, 4).padding(.vertical, 1)
+                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.red.opacity(0.8)))
+                    }
                     Spacer()
                     Image(systemName: "chevron.right")
                         .rotationEffect(.degrees(collapsed ? 0 : 90))
                 }
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(experimental ? AnyShapeStyle(Color.red.opacity(0.85)) : AnyShapeStyle(.secondary))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Clic para plegar o desplegar; ⌥ clic, todas las secciones")
+            .help(experimental ? "Experimental: puede dar resultados raros en algunas fotos. Clic para plegar o desplegar."
+                  : "Clic para plegar o desplegar; ⌥ clic, todas las secciones")
             if !collapsed { content() }
         }
     }

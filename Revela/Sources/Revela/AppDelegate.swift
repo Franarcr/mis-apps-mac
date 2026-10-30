@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var window: NSWindow!
     let model = EditorModel()
 
@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
         menu("Archivo", [
             item("Abrir…", #selector(openPhoto), "o"),
+            recentMenuItem(),
             item("Exportar…", #selector(exportPhoto), "e"),
             item("Aplicar a varias fotos…", #selector(exportBatch), "e", [.command, .shift]),
             .separator(),
@@ -71,6 +72,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.windowsMenu = windowMenu
     }
 
+    /// «Abrir reciente»: el submenú se rellena cada vez que se abre.
+    private func recentMenuItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Abrir reciente", action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: "Abrir reciente")
+        submenu.delegate = self
+        item.submenu = submenu
+        return item
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu.title == "Abrir reciente" else { return }
+        menu.removeAllItems()
+        let recents = model.availableRecents
+        if recents.isEmpty {
+            menu.addItem(NSMenuItem(title: "Sin fotos recientes", action: nil, keyEquivalent: ""))
+            return
+        }
+        for url in recents {
+            let item = NSMenuItem(title: url.lastPathComponent, action: #selector(openRecent(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = url
+            item.image = NSWorkspace.shared.icon(forFile: url.path)
+            item.image?.size = NSSize(width: 16, height: 16)
+            item.toolTip = url.deletingLastPathComponent().path
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let clear = NSMenuItem(title: "Borrar la lista", action: #selector(clearRecents), keyEquivalent: "")
+        clear.target = self
+        menu.addItem(clear)
+    }
+
+    @objc private func openRecent(_ sender: NSMenuItem) { if let url = sender.representedObject as? URL { model.open(url) } }
+    @objc private func clearRecents() { model.clearRecents() }
     @objc private func openPhoto() { model.chooseFile() }
     @objc private func exportPhoto() { model.export() }
     @objc private func exportBatch() { model.exportBatch() }

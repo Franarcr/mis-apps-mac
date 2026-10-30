@@ -74,10 +74,46 @@ extension SegmentModel {
             union = union.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: other])
         }
         union = union.cropped(to: extent)
-        guard let guide else { return union }
+        guard let rawGuide = guide else { return union }
+        let guide = displayable(rawGuide)
         // El agua tiene más textura que el cielo (olas, gotas): se admite algo más de diferencia de color.
-        return EdgeRefiner.refine(union, photo: guide.cropped(to: extent), cell: extent.width / 256,
-                                  similar: 0.03, different: 0.08, reach: 9, greenWeight: 0.6, rejectGreener: true)
+        let photo = guide.cropped(to: extent)
+        let refined = EdgeRefiner.refine(union, photo: photo, cell: extent.width / 256,
+                                         similar: 0.03, different: 0.08, reach: 9, greenWeight: 0.6, rejectGreener: true)
+        // El agua que asoma entre cañas y plantas lejos del borde (SAM las toma como un bloque): cerca del agua
+        // seleccionada, lo que tiene su color también es agua (como el cielo entre las hojas de un árbol).
+        let small = CGAffineTransform(scaleX: 1.0 / 8, y: 1.0 / 8)
+        let near = scaled(refined.transformed(by: small).clampedToExtent()
+            .applyingGaussianBlur(sigma: Double(extent.width / 40 / 8))
+            .transformed(by: small.inverted()).cropped(to: extent), 4, 0)
+        var gaps = Arith.mul(similarToSky(photo, sky: refined, near: 0.04, far: 0.09), near)
+        if let excluding { gaps = Arith.mul(gaps, excluding.applyingFilter("CIColorInvert").cropped(to: extent)) }
+        let water = refined.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: gaps]).cropped(to: extent)
+        // El agua no sube por encima de lo que SAM ve como agua: la niebla o el cielo de la otra orilla pueden
+        // tener su mismo color, y el ajuste por color se metería en ellos.
+        guard let top = topRow(of: union) else { return water }
+        let f = CIFilter.linearGradient()
+        f.point0 = CGPoint(x: 0, y: top)
+        f.point1 = CGPoint(x: 0, y: top + extent.height * 0.01)
+        f.color0 = CIColor(red: 1, green: 1, blue: 1)
+        f.color1 = CIColor(red: 0, green: 0, blue: 0)
+        return Arith.mul(water, f.outputImage!.cropped(to: extent)).cropped(to: extent)
+    }
+
+    /// Altura (en la imagen) de la fila más alta donde al menos un 3 % de la fila es de la máscara.
+    private static func topRow(of mask: CIImage) -> CGFloat? {
+        let extent = mask.extent
+        let rows = 128, cols = 64
+        let small = mask.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: CGFloat(cols) / extent.width, y: CGFloat(rows) / extent.height))
+        var pixels = [Float](repeating: 0, count: rows * cols * 4)
+        averageContext.render(small, toBitmap: &pixels, rowBytes: cols * 16, bounds: CGRect(x: 0, y: 0, width: cols, height: rows),
+                              format: .RGBAf, colorSpace: nil)
+        for row in 0..<rows {   // fila 0 = arriba
+            let amount = (0..<cols).reduce(Float(0)) { $0 + (pixels[(row * cols + $1) * 4] > 0.5 ? 1 : 0) } / Float(cols)
+            if amount >= 0.03 { return extent.maxY - extent.height * CGFloat(row) / CGFloat(rows) }
+        }
+        return nil
     }
 
     /// `guide`: la foto; para el cielo, el borde de la máscara se ajusta al color de la foto
@@ -126,7 +162,8 @@ extension SegmentModel {
                 "inputBVector": CIVector(x: 1, y: 0, z: 0, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
             ])
             .cropped(to: extent)
-        guard let guide else { return coarse }
+        guard let rawGuide = guide else { return coarse }
+        let guide = displayable(rawGuide)
         let cell = extent.width / CGFloat(width)
         let wide = EdgeRefiner.refine(coarse, photo: guide.cropped(to: extent), cell: cell)
         guard connectedToTop else { return wide }
@@ -140,7 +177,17 @@ extension SegmentModel {
         // Pero lo que en esa franja tiene el color del cielo viejo (niebla casi blanca pegada al cielo) es cielo
         // del todo: a medias quedaría un ribete pálido entre el cielo nuevo y la niebla.
         let photo = guide.cropped(to: extent)
-        let rim = Arith.mul(scaled(spread, 3, 0), similarToSky(photo, sky: tight, near: 0.06, far: 0.12))
+        var rim = Arith.mul(scaled(spread, 3, 0), similarToSky(photo, sky: tight, near: 0.06, far: 0.12))
+        // Niebla lisa del color del cielo pegada a él (SAM corta con su forma gruesa y deja una mancha pálida
+        // encima de árboles y tejados lejanos): llega más lejos, pero solo a lo liso y muy parecido al cielo;
+        // lo que tiene detalle (árboles, tejados, molinos) se queda como está.
+        let eighth = CGAffineTransform(scaleX: 1.0 / 8, y: 1.0 / 8)
+        let reach = scaled(tight.transformed(by: eighth).clampedToExtent()
+            .applyingGaussianBlur(sigma: Double(cell * 5 / 8))
+            .transformed(by: eighth.inverted()).cropped(to: extent), 5, 0)
+        let smooth = scaled(Texture.map(photo), -3, 1.6)
+        let fog = Arith.mul(Arith.mul(reach, smooth), similarToSky(photo, sky: tight, near: 0.025, far: 0.05))
+        rim = rim.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: fog]).cropped(to: extent)
         let soft = spread
             .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: tight])
             .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: rim]).cropped(to: extent)
@@ -157,6 +204,12 @@ extension SegmentModel {
     }
 
     private static let averageContext = CIContext(options: [.cacheIntermediates: false])
+
+    /// La foto como se ve (de 0 a 1). Un RAW guarda las luces quemadas por encima del blanco (1,5, 2…): un cielo
+    /// quemado y la rejilla de unas aspas sobre él se ven igual de blancos pero darían colores muy distintos.
+    private static func displayable(_ photo: CIImage) -> CIImage {
+        photo.applyingFilter("CIColorClamp").cropped(to: photo.extent)
+    }
 
     /// k·x + bias, recortado a 0…1.
     private static func scaled(_ x: CIImage, _ k: CGFloat, _ bias: CGFloat) -> CIImage {
@@ -397,7 +450,17 @@ enum EdgeRefiner {
 /// Operaciones aritméticas por píxel con signo (Core Image trabaja en coma flotante).
 /// Cuánto detalle fino hay alrededor de cada píxel (0 = liso, como niebla o cielo; 1 = hojas, ramas).
 enum Texture {
-    static func map(_ image: CIImage) -> CIImage {
+    static func map(_ full: CIImage) -> CIImage {
+        // Se calcula como mucho a 2048 px de ancho (es un mapa suave): a tamaño completo, sus desenfoques grandes
+        // hacían que una exportación tardara minutos. En la vista previa no cambia nada.
+        let k = min(1, 2048 / full.extent.width)
+        guard k < 1 else { return detailMap(full) }
+        let small = CGAffineTransform(scaleX: k, y: k)
+        return detailMap(full.transformed(by: small)).clampedToExtent()
+            .transformed(by: small.inverted()).cropped(to: full.extent)
+    }
+
+    private static func detailMap(_ image: CIImage) -> CIImage {
         let extent = image.extent
         let r = Double(max(1, extent.width / 1000))
         let third = CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0)
@@ -415,18 +478,27 @@ enum Texture {
     }
 }
 
+/// Operaciones píxel a píxel que admiten valores negativos (los filtros de composición de Core Image los
+/// recortan a cero, y una corrección «cielo nuevo − cielo viejo» que debe oscurecer no haría nada).
 enum Arith {
-    static func sub(_ a: CIImage, _ b: CIImage) -> CIImage {
-        let negated = b.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: -1, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: -1, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: -1, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-        ])
-        return negated.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: a]).cropped(to: a.extent)
+    private static let kernels: (sub: CIColorKernel, mul: CIColorKernel, add: CIColorKernel, ratio: CIColorKernel) = {
+        func make(_ body: String) -> CIColorKernel {
+            CIColorKernel(source: "kernel vec4 f(__sample a, __sample b) { return vec4(\(body), a.a); }")!
+        }
+        return (make("a.rgb - b.rgb"), make("a.rgb * b.rgb"), make("a.rgb + b.rgb"),
+                make("a.rgb / max(b.rgb, vec3(0.02))"))
+    }()
+
+    /// a / b (b como mínimo 0,02).
+    static func ratio(_ a: CIImage, _ b: CIImage) -> CIImage { apply(kernels.ratio, a, b) }
+
+    private static func apply(_ kernel: CIColorKernel, _ a: CIImage, _ b: CIImage) -> CIImage {
+        kernel.apply(extent: a.extent, arguments: [a, b]) ?? a
     }
 
-    static func mul(_ a: CIImage, _ b: CIImage) -> CIImage {
-        a.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: b]).cropped(to: a.extent)
-    }
+    static func sub(_ a: CIImage, _ b: CIImage) -> CIImage { apply(kernels.sub, a, b) }
+    static func mul(_ a: CIImage, _ b: CIImage) -> CIImage { apply(kernels.mul, a, b) }
+    static func add(_ a: CIImage, _ b: CIImage) -> CIImage { apply(kernels.add, a, b) }
 
     /// r + g + b en los tres canales.
     static func sum(_ a: CIImage) -> CIImage {
@@ -434,10 +506,5 @@ enum Arith {
         return a.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": ones, "inputGVector": ones, "inputBVector": ones, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
         ])
-    }
-
-    static func add(_ a: CIImage, _ b: CIImage) -> CIImage {
-        let opaqueB = b.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0)])
-        return opaqueB.applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: a]).cropped(to: a.extent)
     }
 }

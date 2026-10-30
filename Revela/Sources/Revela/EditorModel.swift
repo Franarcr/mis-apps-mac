@@ -106,6 +106,24 @@ final class EditorModel: ObservableObject {
         if panel.runModal() == .OK, let url = panel.url { open(url) }
     }
 
+    /// Fotos abiertas hace poco (la más reciente primero), para «Abrir reciente».
+    // La primera vez, la lista empieza con las fotos que ya tienen ajustes guardados.
+    @Published private(set) var recents: [URL] = UserDefaults.standard.stringArray(forKey: "fotosRecientes")
+        .map { $0.map { URL(fileURLWithPath: $0) } } ?? Array(EditStore.editedPhotos.prefix(12))
+
+    /// Las recientes que siguen ahí (las de un disco externo desconectado no se muestran).
+    var availableRecents: [URL] { recents.filter { FileManager.default.fileExists(atPath: $0.path) } }
+
+    private func remember(_ url: URL) {
+        recents = Array(([url] + recents.filter { $0.path != url.path }).prefix(12))
+        UserDefaults.standard.set(recents.map(\.path), forKey: "fotosRecientes")
+    }
+
+    func clearRecents() {
+        recents = []
+        UserDefaults.standard.removeObject(forKey: "fotosRecientes")
+    }
+
     func open(_ url: URL) {
         autoLightUndo = nil
         busy = "Abriendo \(url.lastPathComponent)…"
@@ -116,6 +134,7 @@ final class EditorModel: ObservableObject {
                 self.busy = nil
                 switch result {
                 case .success(let photo):
+                    if !EditStore.readOnly { self.remember(url) }
                     self.photo = photo
                     self.original = original
                     self.mask = nil
@@ -337,8 +356,8 @@ final class EditorModel: ObservableObject {
     private func computeSkyMask() {
         guard segmentInstalled else { return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: photo.preview.extent,
-                                         connectedToTop: true, guide: photo.preview)
+            let mask = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: photo.detail.extent,
+                                         connectedToTop: true, guide: photo.detail).map(photo.previewMask)
             DispatchQueue.main.async {
                 guard self.photo === photo else { return }
                 self.skyMask = mask
@@ -373,8 +392,8 @@ final class EditorModel: ObservableObject {
         let sky = skyMask
         guard !points.isEmpty else { waterMask = nil; scheduleRender(); return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent, guide: photo.preview,
-                                               excluding: sky)
+            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.detail.extent, guide: photo.detail,
+                                               excluding: sky).map(photo.previewMask)
             DispatchQueue.main.async {
                 guard self.photo === photo, self.adjustments.water == points else { return }
                 self.waterMask = mask
@@ -671,6 +690,9 @@ enum EditStore {
     }()
 
     static func load(for url: URL) -> Adjustments? { all[url.path] }
+
+    /// Las fotos que tienen ajustes guardados (para empezar la lista de recientes).
+    static var editedPhotos: [URL] { all.keys.sorted().map { URL(fileURLWithPath: $0) } }
 
     /// En el modo de captura (pruebas) no se guarda nada, para no tocar las ediciones de las fotos.
     static var readOnly = false

@@ -115,6 +115,7 @@ struct Adjustments: Codable, Equatable {
 
 /// Aplica los ajustes a una imagen. Todo es Core Image (en la GPU) y no destructivo.
 enum Develop {
+
     /// `mask`: máscara del sujeto (blanco = sujeto) del mismo tamaño que `image`, si hace falta.
     /// `scale`: tamaño relativo a la foto completa (para que radios y texturas se vean igual en la vista previa).
     static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage?, faces: FaceMasks? = nil,
@@ -149,6 +150,13 @@ enum Develop {
         if var water, a.waterTint > 0 || a.waterReflection > 0 || a.waterLight != 0 {
             // El agua nunca es cielo: si un clic del agua cayó en el cielo, el cielo no se toca.
             if let sky { water = Arith.mul(water, sky.applyingFilter("CIColorInvert")).applyingFilter("CIColorClamp") }
+            // La máscara deja 1–2 px de agua sin tocar junto a cada caña o tallo; con el agua cambiada de color o
+            // de luz se vería como un halo. Se ensancha un poco, sobre todo hacia lo fino.
+            let r = max(1, extent.width / 1500)
+            let wider = water.clampedToExtent()
+                .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: r])
+                .applyingGaussianBlur(sigma: Double(r) * 0.5).cropped(to: extent)
+            water = water.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: wider]).cropped(to: extent)
             img = Water.apply(a, to: img, water: water, sky: sky)
         }
 
@@ -238,7 +246,7 @@ enum Develop {
             let sigma = max(0.8, 4 * scale)
             let base = img.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
             let detail = Arith.sub(img, base)
-            let k = a.texture / 100 * (a.texture > 0 ? 1.6 : 0.8)
+            let k = a.texture / 100 * (a.texture > 0 ? 0.9 : 0.8)
             img = Arith.add(img, detail.applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: CGFloat(k), y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: CGFloat(k), z: 0, w: 0),
                 "inputBVector": CIVector(x: 0, y: 0, z: CGFloat(k), w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),

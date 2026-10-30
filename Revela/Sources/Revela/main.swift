@@ -70,6 +70,7 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
             case "intensidad": a.skyAmount = 100
             case "borrado": a.erase = []
             case "luces": a.highlights = 0
+            case "exposicion": a.exposure = 0
             case "bruma": a.skyHaze = 0
             case "cielo": a.skyReplacement = nil
             default: break
@@ -88,6 +89,7 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
                      a.exposure, a.contrast, a.highlights, a.shadows, a.whites, a.blacks))
     }
     if let h = arguments.firstIndex(of: "--textura"), arguments.count > h + 1 { a.texture = Double(arguments[h + 1]) ?? 0 }
+    if let h = arguments.firstIndex(of: "--armonizar"), arguments.count > h + 1 { a.skyHarmonize = Double(arguments[h + 1]) ?? 0 }
     if let h = arguments.firstIndex(of: "--neblina"), arguments.count > h + 1 { a.dehaze = Double(arguments[h + 1]) ?? 0 }
     if let h = arguments.firstIndex(of: "--reiluminar"), arguments.count > h + 1 { a.relight = Double(arguments[h + 1]) ?? 0 }
     // --agua x,y tono reflejo luz: prueba los ajustes de agua sin guardarlos.
@@ -112,8 +114,25 @@ if let i = arguments.firstIndex(of: "--mascara-cielo"), arguments.count > i + 2 
     let context = CIContext()
     let embedding = SegmentModel.encode(image, context: context)!
     let coarse = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: image.extent, connectedToTop: true)!
-    let fine = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: image.extent, connectedToTop: true, guide: image)!
-    for (name, m) in [("gruesa", coarse), ("fina", fine)] {
+    var fine = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: image.extent, connectedToTop: true, guide: image)!
+    if arguments.contains("--detalle") {
+        // Como en la vista previa del editor: con la copia de detalle, llevada al tamaño de la vista previa.
+        fine = photo.previewMask(SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: photo.detail.extent,
+                                                   connectedToTop: true, guide: photo.detail)!)
+    }
+    var masks = [("gruesa", coarse), ("fina", fine)]
+    // --agua x,y[;x,y…]: también la máscara del agua de esos clics (como en la vista previa con --detalle).
+    if let w = arguments.firstIndex(of: "--agua"), arguments.count > w + 1 {
+        let points = arguments[w + 1].split(separator: ";").map { p -> SelectionPoint in
+            let v = p.split(separator: ",").compactMap { Double($0) }
+            return SelectionPoint(x: v[0], y: v[1])
+        }
+        let guide = arguments.contains("--detalle") ? photo.detail : image
+        if let water = SegmentModel.objectMask(embedding, points: points, extent: guide.extent, guide: guide, excluding: fine) {
+            masks.append(("agua", arguments.contains("--detalle") ? photo.previewMask(water) : water))
+        }
+    }
+    for (name, m) in masks {
         try? context.writePNGRepresentation(of: m, to: URL(fileURLWithPath: arguments[i + 2] + "-\(name).png"), format: .RGBA8,
                                             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     }
@@ -236,7 +255,7 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
         EditStore.readOnly = true
         let model = EditorModel()
         // --plegado: con algunas secciones plegadas (para ver cómo queda).
-        if arguments.contains("--plegado") { model.collapsedSections = ["Inteligencia artificial", "Borrar objetos", "Selección con un clic", "Agua", "Retrato"] }
+        if arguments.contains("--plegado") { model.collapsedSections = ["Inteligencia artificial", "Borrar objetos", "Selección con un clic", "Retrato"] }
         if arguments.count > index + 2 {
             model.open(URL(fileURLWithPath: arguments[index + 2]))
             RunLoop.main.run(until: Date().addingTimeInterval(2))

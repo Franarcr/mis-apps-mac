@@ -98,9 +98,33 @@ enum Skies {
         if a.skyHaze > 0 {
             ground = horizonHaze(ground, newSky: sky, mask: mask, horizon: horizon(of: mask, in: extent), amount: a.skyHaze / 100)
         }
-        ground = liftFog(ground, newSky: localSky(sky, mask: mask), oldSky: oldSky, mask: mask,
+        ground = liftFog(ground, reference: image, newSky: localSky(sky, mask: mask), oldSky: oldSky, mask: mask,
                          horizon: horizon(of: mask, in: extent))
         if let subject { ground = Develop.blend(unhazed, over: ground, mask: subject) }
+        // Las estructuras finas junto al cielo (la rejilla de unas aspas, cables) que tienen casi el color del
+        // cielo viejo están veladas por la misma niebla o luz: toman la parte proporcional del cielo nuevo.
+        // (cerrado de la máscara a como mucho 2048 px de ancho: a tamaño completo es muy lento)
+        let k = min(1, 2048 / extent.width)
+        let down = CGAffineTransform(scaleX: k, y: k)
+        let closed = mask.transformed(by: down).clampedToExtent()
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: grow * 3 * k])
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: grow * 3 * k])
+            .transformed(by: down.inverted()).cropped(to: extent)
+        let thinObjects = Arith.mul(mask.applyingFilter("CIColorInvert").cropped(to: extent), closed)
+        let third = CGFloat(1) / 3
+        // (comparados como se ven, de 0 a 1: en un RAW el cielo quemado vale más que el blanco)
+        let veil = ground.applyingFilter("CIColorClamp")
+            .applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: oldSky.applyingFilter("CIColorClamp")])
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: -2.5 * third, y: -2.5 * third, z: -2.5 * third, w: 0),
+                "inputGVector": CIVector(x: -2.5 * third, y: -2.5 * third, z: -2.5 * third, w: 0),
+                "inputBVector": CIVector(x: -2.5 * third, y: -2.5 * third, z: -2.5 * third, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
+            ]).applyingFilter("CIColorClamp").cropped(to: extent)
+        // Proporcional (×cielo nuevo / cielo viejo): con una resta, lo oscuro se pasaría de negro.
+        ground = Develop.blend(relit(ground, newSky: sky, oldSky: oldSky, chroma: 0.5), over: ground,
+                               mask: Arith.mul(thinObjects, veil))
         // Solo se crece junto a objetos gruesos (árboles, edificios): las estructuras finas (listones de las
         // aspas, cables, ramas sueltas) desaparecerían. Un objeto es grueso si sobrevive a una apertura.
         let notSky = mask.applyingFilter("CIColorInvert")
@@ -127,38 +151,61 @@ enum Skies {
     /// Niebla junto al cielo: los árboles y edificios lejanos se ven a través de un velo del color del cielo
     /// viejo (y entre ellos asoma ese cielo). Cuanto más se parece un píxel al cielo viejo de su zona, más velo
     /// tiene, y ese velo se cambia por el color del cielo nuevo. Lo oscuro o de otro color (lo cercano) no cambia.
-    private static func liftFog(_ ground: CIImage, newSky: CIImage, oldSky: CIImage, mask: CIImage,
+    private static let fogKernel = CIColorKernel(source: """
+        kernel vec4 fogVeil(__sample g, __sample o) {
+            float lg = max((g.r + g.g + g.b) / 3.0, 0.001);
+            float lo = max((o.r + o.g + o.b) / 3.0, 0.001);
+            vec3 d = abs(g.rgb / lg - o.rgb / lo);
+            float hue = clamp(1.0 - (d.r + d.g + d.b) / 3.0 / 0.12, 0.0, 1.0);
+            float bright = clamp((lg / lo - 0.15) / 0.25, 0.0, 1.0);
+            float v = hue * bright;
+            return vec4(v, v, v, 1.0);
+        }
+        """)!
+
+    /// `reference`: la foto antes de armonizar (para reconocer la niebla por su tono, que armonizar ya cambió).
+    private static func liftFog(_ ground: CIImage, reference: CIImage, newSky: CIImage, oldSky: CIImage, mask: CIImage,
                                 horizon: CGFloat) -> CIImage {
         let extent = ground.extent
-        // Diferencia media con el cielo viejo: 0 → todo velo, ≥ 0,4 → nada.
-        let third = CGFloat(1) / 3
-        let veil = ground.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: oldSky])
-            .applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: -1.8 * third, y: -1.8 * third, z: -1.8 * third, w: 0),
-                "inputGVector": CIVector(x: -1.8 * third, y: -1.8 * third, z: -1.8 * third, w: 0),
-                "inputBVector": CIVector(x: -1.8 * third, y: -1.8 * third, z: -1.8 * third, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-                "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
-            ]).applyingFilter("CIColorClamp").cropped(to: extent)
+        // Velo: lo que tiene el mismo tono que el cielo viejo de su zona (gris con gris), aunque sea más oscuro
+        // (la niebla queda por debajo de un cielo quemado). Lo muy oscuro o de otro color no es velo.
+        let veil = fogKernel.apply(extent: extent, arguments: [reference, oldSky]) ?? ground
         // Solo cerca del cielo y por encima del horizonte (lo de abajo, la orilla y el agua, está cerca).
         // (a 1/16 del tamaño: con un radio tan grande, a resolución completa no cabe en memoria)
         let small = CGAffineTransform(scaleX: 1.0 / 16, y: 1.0 / 16)
         let near = mask.transformed(by: small).clampedToExtent()
-            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: extent.width / 40 / 16])
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: extent.width / 30 / 16])
             .applyingGaussianBlur(sigma: Double(extent.width / 80 / 16))
             .transformed(by: small.inverted()).cropped(to: extent)
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.6, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 1.6, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: 1.6, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ]).applyingFilter("CIColorClamp").cropped(to: extent)
         let f = CIFilter.linearGradient()
         f.point0 = CGPoint(x: 0, y: horizon + extent.height * 0.01)
-        f.point1 = CGPoint(x: 0, y: horizon - extent.height * 0.05)
+        f.point1 = CGPoint(x: 0, y: horizon - extent.height * 0.10)
         f.color0 = CIColor(red: 1, green: 1, blue: 1)
         f.color1 = CIColor(red: 0, green: 0, blue: 0)
         let region = Arith.mul(near, f.outputImage!.cropped(to: extent))
         // Solo la niebla de verdad, que es lisa: en el follaje con mucho detalle (un árbol cercano con huecos)
         // el parecido al cielo viene de los huecos, no de un velo, y teñirlo lo dejaría gris azulado.
-        let smooth = Texture.map(ground).applyingFilter("CIColorInvert").cropped(to: extent)
+        let smooth = Texture.map(reference).applyingFilter("CIColorInvert").cropped(to: extent)
         let weight = Arith.mul(Arith.mul(veil, region), smooth)
-        return Arith.add(ground, Arith.mul(weight, Arith.sub(newSky, oldSky)))
-            .applyingFilter("CIColorClamp").cropped(to: extent)
+        return Develop.blend(relit(ground, newSky: newSky, oldSky: oldSky, chroma: 0.6), over: ground, mask: weight)
+    }
+
+    /// `image` con la luz del cielo nuevo en vez de la del viejo: ×(cielo nuevo / cielo viejo). Con `chroma` < 1 el
+    /// cambio de color se suaviza (en objetos oscuros, la proporción de cada canal por separado satura mucho).
+    private static func relit(_ image: CIImage, newSky: CIImage, oldSky: CIImage, chroma: Double = 1) -> CIImage {
+        var r = Arith.ratio(newSky.applyingFilter("CIColorClamp"), oldSky.applyingFilter("CIColorClamp"))
+        if chroma < 1 {
+            let l = CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0)
+            let gray = r.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": l, "inputGVector": l, "inputBVector": l, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ])
+            r = Develop.mix(gray, r, amount: chroma)
+        }
+        return Arith.mul(image, r).applyingFilter("CIColorClamp").cropped(to: image.extent)
     }
 
     /// Valores ≥ 0,9 → 1, el resto baja rápido a 0 (la parte segura de una máscara).
@@ -198,8 +245,9 @@ enum Skies {
     /// segura se pone el cielo nuevo tal cual.
     private static func composite(_ newSky: CIImage, over ground: CIImage, oldSky: CIImage, mask: CIImage) -> CIImage {
         let extent = ground.extent
-        let edge = Arith.add(ground, Arith.mul(mask, Arith.sub(newSky, oldSky)))
-            .applyingFilter("CIColorClamp").cropped(to: extent)
+        // Proporcional: donde es cielo del todo da el cielo nuevo exacto; en el borde (hoja o niebla con cielo
+        // viejo) cambia la luz del cielo sin restar de más (una resta dejaba un contorno oscuro).
+        let edge = Develop.blend(relit(ground, newSky: newSky, oldSky: oldSky), over: ground, mask: mask)
         // Lo que es cielo en su mayoría (≥ 65 %) recibe el cielo nuevo tal cual; la fórmula de borde, solo
         // la franja fina (en huecos pequeños, como los de una rejilla, el cielo viejo puede ser más claro).
         let mostlySky = mask.applyingFilter("CIColorMatrix", parameters: [
@@ -258,8 +306,11 @@ enum Skies {
 
     /// Color medio de `image` dentro de la máscara (media(foto × máscara) / media(máscara)).
     private static func average(_ image: CIImage, mask: CIImage, extent: CGRect) -> [Float]? {
-        func mean(_ x: CIImage) -> [Float] {
-            let avg = x.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: extent)])
+        // Sobre una copia de unos 512 px: la media es la misma y no obliga a calcular la foto completa.
+        let k = min(1, 512 / max(extent.width, extent.height))
+        func mean(_ full: CIImage) -> [Float] {
+            let x = full.transformed(by: CGAffineTransform(scaleX: k, y: k))
+            let avg = x.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: x.extent)])
             var pixel = [Float](repeating: 0, count: 4)
             context.render(avg, toBitmap: &pixel, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
                            format: .RGBAf, colorSpace: nil)
