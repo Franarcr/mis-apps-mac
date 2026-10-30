@@ -117,16 +117,17 @@ enum Exporter {
         var selection: CIImage?, sky: CIImage?, water: CIImage?
         if adjustments.usesSelection || adjustments.usesSky || adjustments.usesWater,
            let embedding = SegmentModel.encode(full, context: context) {
+            if adjustments.usesSky || adjustments.usesWater {
+                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true,
+                                        guide: full)
+            }
             if adjustments.usesWater {
-                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: full.extent, guide: full)
+                water = SegmentModel.objectMask(embedding, points: adjustments.water, extent: full.extent, guide: full, excluding: sky)
             }
             if adjustments.usesSelection {
                 selection = SegmentModel.objectMask(embedding, points: adjustments.selection, extent: full.extent)
             }
-            if adjustments.usesSky {
-                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true,
-                                        guide: full)
-            }
+            if !adjustments.usesSky { sky = nil }
         }
         var output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
                                    selection: selection, sky: sky, water: water, scale: scale)

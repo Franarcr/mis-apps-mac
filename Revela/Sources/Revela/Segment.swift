@@ -61,7 +61,12 @@ extension SegmentModel {
     /// juntan. Si se le pasan a SAM a la vez clics en cosas distintas (agua y cielo, por ejemplo), busca
     /// un solo objeto que lo abarque todo, se confunde y devuelve una máscara a cuadros.
     /// `guide`: la foto; para el agua, el borde se ajusta por color (llega al agua entre plantas y orillas).
-    static func objectMask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect, guide: CIImage? = nil) -> CIImage? {
+    /// `excluding`: para el agua, el cielo; los clics que caen en él se ignoran (si no, el ajuste del borde toma
+    /// el color del cielo como el del agua y la selección se pierde).
+    static func objectMask(_ embedding: Embedding, points: [SelectionPoint], extent: CGRect, guide: CIImage? = nil,
+                           excluding: CIImage? = nil) -> CIImage? {
+        var points = points
+        if let excluding { points = points.filter { !$0.include || value(of: excluding, at: $0) < 0.5 } }
         let negatives = points.filter { !$0.include }
         let masks = points.filter(\.include).compactMap { mask(embedding, points: [$0] + negatives, extent: extent) }
         guard var union = masks.first else { return nil }
@@ -149,6 +154,16 @@ extension SegmentModel {
     /// solo llega a unos 100 px. Por encima del horizonte, cerca del cielo y donde hay mucho detalle (follaje),
     /// lo que tiene el color del cielo de la zona es cielo. Las zonas lisas (fachadas, niebla, ropa) no entran.
     private static let averageContext = CIContext(options: [.cacheIntermediates: false])
+
+    /// Valor de una máscara en un punto (x, y de 0 a 1, origen abajo a la izquierda).
+    static func value(of mask: CIImage, at point: SelectionPoint) -> Float {
+        let e = mask.extent
+        var p = [Float](repeating: 0, count: 4)
+        averageContext.render(mask, toBitmap: &p, rowBytes: 16,
+                              bounds: CGRect(x: (e.minX + point.x * e.width).rounded(.down), y: (e.minY + point.y * e.height).rounded(.down),
+                                             width: 1, height: 1), format: .RGBAf, colorSpace: nil)
+        return p[0]
+    }
 
     private static func skyThroughFoliage(_ sky: CIImage, photo: CIImage, horizon: CGFloat) -> CIImage {
         let extent = sky.extent

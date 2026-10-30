@@ -22,7 +22,7 @@ final class EditorModel: ObservableObject {
             if adjustments.selection != oldValue.selection { updateSelectionMask() }
             if adjustments.erase != oldValue.erase { updateErased() }
             if adjustments.water != oldValue.water { updateWaterMask() }
-            if adjustments.usesSky, skyMask == nil { computeSkyMask() }
+            if adjustments.usesSky || adjustments.usesWater, skyMask == nil { computeSkyMask() }
             scheduleRender()
             saveEdits()
         }
@@ -138,7 +138,7 @@ final class EditorModel: ObservableObject {
                     if self.adjustments.usesFaces { self.detectFaces() }
                     if self.adjustments.usesDepth { self.computeDepth() }
                     if self.adjustments.usesSelection { self.updateSelectionMask() }
-                    if self.adjustments.usesSky { self.computeSkyMask() }
+                    if self.adjustments.usesSky || self.adjustments.usesWater { self.computeSkyMask() }
                     if !self.adjustments.erase.isEmpty { self.updateErased() }
                     if self.adjustments.usesWater { self.updateWaterMask() }
                     self.scheduleRender()
@@ -294,7 +294,7 @@ final class EditorModel: ObservableObject {
                     self.status = "Modelo de profundidad instalado"
                     if self.adjustments.usesDepth { self.computeDepth() }
                     if self.adjustments.usesSelection { self.updateSelectionMask() }
-                    if self.adjustments.usesSky { self.computeSkyMask() }
+                    if self.adjustments.usesSky || self.adjustments.usesWater { self.computeSkyMask() }
                 case .failure(let error):
                     self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"
                 }
@@ -342,7 +342,9 @@ final class EditorModel: ObservableObject {
             DispatchQueue.main.async {
                 guard self.photo === photo else { return }
                 self.skyMask = mask
-                if mask == nil { self.status = "No se encontró cielo en esta foto." }
+                if mask == nil, self.adjustments.usesSky { self.status = "No se encontró cielo en esta foto." }
+                // Con el cielo ya calculado, el agua descarta los clics que cayeron en él.
+                if !self.adjustments.water.isEmpty { self.updateWaterMask() }
                 self.scheduleRender()
             }
         }
@@ -353,11 +355,26 @@ final class EditorModel: ObservableObject {
         adjustments.selection.append(SelectionPoint(x: x, y: y, include: include))
     }
 
+    /// Aviso junto a los controles del agua (por ejemplo, si un clic cae en el cielo).
+    @Published var waterHint: String?
+
+    /// Clic en el modo «Marcar el agua»: si cae en el cielo, no se añade (estropearía la selección).
+    func addWaterPoint(_ point: SelectionPoint) {
+        if point.include, let skyMask, SegmentModel.value(of: skyMask, at: point) >= 0.5 {
+            waterHint = "Ese clic cayó en el cielo y no se añadió. Haz clic sobre el agua."
+            return
+        }
+        waterHint = nil
+        adjustments.water.append(point)
+    }
+
     private func updateWaterMask() {
         let points = adjustments.water
+        let sky = skyMask
         guard !points.isEmpty else { waterMask = nil; scheduleRender(); return }
         withEmbedding { embedding, photo in
-            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent, guide: photo.preview)
+            let mask = SegmentModel.objectMask(embedding, points: points, extent: photo.preview.extent, guide: photo.preview,
+                                               excluding: sky)
             DispatchQueue.main.async {
                 guard self.photo === photo, self.adjustments.water == points else { return }
                 self.waterMask = mask
@@ -393,7 +410,7 @@ final class EditorModel: ObservableObject {
                 case .success:
                     self.segmentInstalled = true
                     self.status = "Modelo de selección instalado"
-                    if self.adjustments.usesSky { self.computeSkyMask() }
+                    if self.adjustments.usesSky || self.adjustments.usesWater { self.computeSkyMask() }
                     if self.adjustments.usesSelection { self.updateSelectionMask() }
                 case .failure(let error):
                     self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"

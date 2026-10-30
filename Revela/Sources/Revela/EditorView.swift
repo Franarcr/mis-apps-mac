@@ -33,7 +33,7 @@ struct EditorView: View {
                             let point = SelectionPoint(x: tap.location.x / rect.width, y: 1 - tap.location.y / rect.height,
                                                        include: !NSEvent.modifierFlags.contains(.option))
                             if model.selecting { model.adjustments.selection.append(point) }
-                            if model.markingWater { model.adjustments.water.append(point) }
+                            if model.markingWater { model.addWaterPoint(point) }
                         })
                         .simultaneousGesture(DragGesture(minimumDistance: 0)
                             .onChanged { drag in
@@ -369,6 +369,9 @@ struct EditorView: View {
                     Button("Deshacer clic") { model.undoWaterClick() }
                     Button("Quitar") { model.clearWater() }
                 }
+            }
+            if let hint = model.waterHint {
+                Text(hint).font(.caption).foregroundStyle(.orange)
             }
             if model.adjustments.water.isEmpty {
                 Text("Pulsa «Marcar el agua» y haz clic en el mar, el lago o el río para que haga juego con el cielo.")
