@@ -26,7 +26,7 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
 
 ## Lo que no hace (frente a Luminar)
 
-Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativo, cambio de cielo, eliminar cables o polvo, ampliar ×2/×4/×6, reiluminar caras… Esos modelos no se pueden reutilizar. Revela usa la IA de macOS y modelos abiertos de uso libre; El borrado de LaMa es bueno con objetos pequeños y medianos; en zonas grandes y con mucho detalle puede verse borroso.
+Luminar trae unos 60 modelos de IA propios de Skylum (3,2 GB): borrado generativo, cambio de cielo, eliminar cables o polvo, ampliar ×2/×4/×6, reiluminar caras… Esos modelos no se pueden reutilizar. Revela usa la IA de macOS y modelos abiertos de uso libre (profundidad, selección, borrado y ampliación). El borrado de LaMa es bueno con objetos pequeños y medianos; en zonas grandes y con mucho detalle puede verse borroso.
 
 ## Para pruebas
 
