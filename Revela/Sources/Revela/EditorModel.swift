@@ -30,6 +30,10 @@ final class EditorModel: ObservableObject {
     @Published private(set) var rendered: CGImage?
     @Published private(set) var original: CGImage?
     @Published var showOriginal = false
+    /// Secciones de ajustes plegadas (se recuerdan entre sesiones).
+    @Published var collapsedSections = Set(UserDefaults.standard.stringArray(forKey: "seccionesPlegadas") ?? []) {
+        didSet { if !EditStore.readOnly { UserDefaults.standard.set(Array(collapsedSections), forKey: "seccionesPlegadas") } }
+    }
     @Published private(set) var status: String?
     @Published private(set) var busy: String?
     @Published private(set) var importedLooks = Looks.imported()

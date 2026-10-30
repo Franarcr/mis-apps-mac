@@ -416,13 +416,36 @@ struct EditorView: View {
     // MARK: Piezas
 
     private func section<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title.uppercased(), systemImage: icon)
+        let collapsed = model.collapsedSections.contains(title)
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                // ⌥ clic pliega o despliega todas las secciones a la vez.
+                if NSEvent.modifierFlags.contains(.option) {
+                    model.collapsedSections = collapsed ? [] : Set(Self.sectionTitles)
+                } else if collapsed {
+                    model.collapsedSections.remove(title)
+                } else {
+                    model.collapsedSections.insert(title)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Label(title.uppercased(), systemImage: icon)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .rotationEffect(.degrees(collapsed ? 0 : 90))
+                }
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.secondary)
-            content()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Clic para plegar o desplegar; ⌥ clic, todas las secciones")
+            if !collapsed { content() }
         }
     }
+
+    private static let sectionTitles = ["Inteligencia artificial", "Borrar objetos", "Selección con un clic", "Cielo",
+                                        "Agua", "Retrato", "Luz", "Color", "Detalle", "Looks", "Exportar"]
 
     /// Control deslizante. Doble clic en el nombre lo devuelve a su valor inicial.
     private func slider(_ title: String, _ key: WritableKeyPath<Adjustments, Double>, _ range: ClosedRange<Double>,

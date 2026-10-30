@@ -221,6 +221,8 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
         _ = NSApplication.shared
         EditStore.readOnly = true
         let model = EditorModel()
+        // --plegado: con algunas secciones plegadas (para ver cómo queda).
+        if arguments.contains("--plegado") { model.collapsedSections = ["Inteligencia artificial", "Borrar objetos", "Selección con un clic", "Agua", "Retrato"] }
         if arguments.count > index + 2 {
             model.open(URL(fileURLWithPath: arguments[index + 2]))
             RunLoop.main.run(until: Date().addingTimeInterval(2))
