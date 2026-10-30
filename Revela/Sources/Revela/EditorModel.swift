@@ -38,6 +38,12 @@ final class EditorModel: ObservableObject {
         didSet { UserDefaults.standard.set(exportUpscale, forKey: "ampliar") }
     }
     @Published private(set) var upscaleInstalled = UpscaleModel.isInstalled
+    /// Ajustes copiados para pegarlos en otra foto (se conservan al cerrar la app).
+    @Published private(set) var copied: Adjustments? = UserDefaults.standard.data(forKey: "ajustesCopiados")
+        .flatMap { try? JSONDecoder().decode(Adjustments.self, from: $0) } {
+        didSet { UserDefaults.standard.set(copied.flatMap { try? JSONEncoder().encode($0) }, forKey: "ajustesCopiados") }
+    }
+    @Published private(set) var mySkies = Skies.mine()
     /// Estado de vista (sin @State: estas herramientas de compilación no traen sus macros).
     @Published var dropTargeted = false
 
@@ -347,11 +353,40 @@ final class EditorModel: ObservableObject {
         }
     }
 
+    /// Añade fotos de cielo a «Mis cielos» (se copian a la app) y usa la última.
     func chooseSkyPhoto() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = Photo.openableTypes
-        panel.message = "Elige una foto de cielo"
-        if panel.runModal() == .OK, let url = panel.url { adjustments.skyReplacement = url.path }
+        panel.allowsMultipleSelection = true
+        panel.message = "Elige una o varias fotos de cielo para «Mis cielos»"
+        guard panel.runModal() == .OK else { return }
+        var last: Skies.Sky?
+        for url in panel.urls {
+            do { last = try Skies.add(url) } catch { status = "No se pudo añadir \(url.lastPathComponent): \(error.localizedDescription)" }
+        }
+        mySkies = Skies.mine()
+        if let last { adjustments.skyReplacement = last.id }
+    }
+
+    func removeSky(_ sky: Skies.Sky) {
+        if adjustments.skyReplacement == sky.id { adjustments.skyReplacement = nil }
+        try? FileManager.default.removeItem(atPath: sky.id)
+        mySkies = Skies.mine()
+    }
+
+    // MARK: Copiar y pegar ajustes
+
+    func copyAdjustments() {
+        copied = adjustments.transferable
+        status = "Ajustes copiados: abre otra foto y pulsa «Pegar ajustes»"
+    }
+
+    /// Pega los ajustes copiados, conservando lo propio de esta foto (clics, trazos y enderezado).
+    func pasteAdjustments() {
+        guard var pasted = copied, photo != nil else { return }
+        pasted.keepPhotoSpecific(from: adjustments)
+        adjustments = pasted
+        status = "Ajustes pegados"
     }
 
     // MARK: Borrar objetos (LaMa)
@@ -519,6 +554,7 @@ final class EditorModel: ObservableObject {
 
     private func run(photos: [URL], to destination: @escaping (URL) -> URL) {
         let adjustments = adjustments, format = exportFormat, quality = exportQuality
+        let current = photo?.url
         let upscale = upscaleInstalled ? exportUpscale : 1
         busy = photos.count == 1 ? "Exportando…" : "Exportando 1 de \(photos.count)…"
         Self.queue.async {
@@ -529,7 +565,9 @@ final class EditorModel: ObservableObject {
                 do {
                     let photo = try Photo(url: url)
                     let label = photos.count > 1 ? "Exportando \(index + 1) de \(photos.count)" : "Exportando"
-                    try Exporter.export(photo, adjustments: adjustments, to: destination(url), format: format,
+                    // En las demás fotos no se usan los clics, trazos ni enderezado de esta.
+                    let settings = url == current ? adjustments : adjustments.transferable
+                    try Exporter.export(photo, adjustments: settings, to: destination(url), format: format,
                                         quality: quality, upscale: upscale, context: Self.context) { progress in
                         DispatchQueue.main.async { self.busy = "\(label) · ampliando \(Int(progress * 100)) %…" }
                     }

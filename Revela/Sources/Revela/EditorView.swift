@@ -107,6 +107,11 @@ struct EditorView: View {
                 Button { model.undo() } label: { Label("Deshacer", systemImage: "arrow.uturn.backward") }
                     .disabled(!model.canUndo)
                 Button { model.reset() } label: { Label("Restablecer", systemImage: "arrow.counterclockwise") }
+                Button { model.copyAdjustments() } label: { Label("Copiar ajustes", systemImage: "doc.on.doc") }
+                    .help("Copia los ajustes de esta foto (sin clics, trazos ni enderezado) para pegarlos en otra")
+                if model.copied != nil {
+                    Button { model.pasteAdjustments() } label: { Label("Pegar ajustes", systemImage: "doc.on.clipboard") }
+                }
                 Spacer()
                 Button { model.export() } label: { Label("Exportar", systemImage: "square.and.arrow.up") }
                     .buttonStyle(.borderedProminent)
@@ -309,10 +314,18 @@ struct EditorView: View {
                     }
                 }
             }
-            if let custom = model.adjustments.skyReplacement, !Skies.builtIn.contains(where: { $0.id == custom }) {
-                Text("Cielo: \(Skies.name(of: custom))").font(.caption)
+            if !model.mySkies.isEmpty {
+                Text("Mis cielos").foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 82), spacing: 6)], spacing: 6) {
+                    ForEach(model.mySkies) { sky in
+                        chip(sky.name, selected: model.adjustments.skyReplacement == sky.id) {
+                            model.adjustments.skyReplacement = sky.id
+                        }
+                        .contextMenu { Button("Quitar de Mis cielos") { model.removeSky(sky) } }
+                    }
+                }
             }
-            Button("Usar una foto de cielo…") { model.chooseSkyPhoto() }
+            Button("Añadir fotos de cielo…") { model.chooseSkyPhoto() }
             if model.adjustments.skyReplacement != nil { slider("Intensidad del cielo", \.skyAmount, 0...100) }
         } else {
             downloadSegmentButton

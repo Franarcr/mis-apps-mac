@@ -85,6 +85,25 @@ struct Adjustments: Codable, Equatable {
         autoEnhance = (try? c.decode(Bool.self, forKey: .autoEnhance)) ?? false
     }
     static let neutral = Adjustments()
+
+    /// Los ajustes que tienen sentido en otra foto: sin los clics de selección y de agua, los trazos de
+    /// borrar ni el enderezado, que dependen de dónde está cada cosa en esta foto.
+    var transferable: Adjustments {
+        var a = self
+        a.keepPhotoSpecific(from: .neutral)
+        return a
+    }
+
+    /// Copia de `other` lo que es propio de una foto (clics, trazos, enderezado y sus ajustes).
+    mutating func keepPhotoSpecific(from other: Adjustments) {
+        selection = other.selection
+        selExposure = other.selExposure; selContrast = other.selContrast
+        selSaturation = other.selSaturation; selTemperature = other.selTemperature
+        water = other.water
+        waterTint = other.waterTint; waterReflection = other.waterReflection; waterLight = other.waterLight
+        erase = other.erase
+        straighten = other.straighten
+    }
 }
 
 /// Aplica los ajustes a una imagen. Todo es Core Image (en la GPU) y no destructivo.

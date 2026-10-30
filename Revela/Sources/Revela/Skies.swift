@@ -17,6 +17,30 @@ enum Skies {
         Sky(id: "tormenta", name: "Tormenta"),
     ]
 
+    /// «Mis cielos»: fotos de cielo copiadas a ~/Library/Application Support/Revela/Cielos.
+    static var folder: URL {
+        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Revela/Cielos")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    static func mine() -> [Sky] {
+        ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.creationDateKey])) ?? [])
+            .filter { !$0.lastPathComponent.hasPrefix(".") }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            .map { Sky(id: $0.path, name: $0.deletingPathExtension().lastPathComponent) }
+    }
+
+    /// Copia una foto de cielo a «Mis cielos» (si ya estaba, la reutiliza).
+    static func add(_ url: URL) throws -> Sky {
+        let destination = folder.appendingPathComponent(url.lastPathComponent)
+        if url.standardizedFileURL != destination.standardizedFileURL, !FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.copyItem(at: url, to: destination)
+        }
+        return Sky(id: destination.path, name: destination.deletingPathExtension().lastPathComponent)
+    }
+
     static func name(of id: String) -> String {
         builtIn.first { $0.id == id }?.name ?? URL(fileURLWithPath: id).deletingPathExtension().lastPathComponent
     }

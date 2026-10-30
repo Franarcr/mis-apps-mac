@@ -17,13 +17,14 @@ Editor de fotos para macOS (14+), inspirado en Luminar Neo. Edita sin tocar la f
   - **Desenfoque de lente**: desenfoca según la distancia de cada punto, como un objetivo luminoso; el sujeto queda enfocado. Usa el modelo **Depth Anything V2** de Apple (licencia Apache 2.0, ~50 MB), que se descarga una sola vez con el botón *Descargar desenfoque de lente* y se guarda en `~/Library/Application Support/Revela/Modelos/`.
 - **Borrar objetos** (LaMa, licencia Apache 2.0, conversión a Core ML de MLBoy, ~217 MB, se descarga una vez): pulsa *Pincel* y pinta sobre personas, cables, manchas o cualquier cosa; se rellena con lo que debería haber detrás. Solo se procesa un recorte alrededor de lo pintado, así la foto conserva su resolución completa. *Deshacer trazo* y *Quitar todo* lo revierten.
 - **Selección con un clic** (SAM 2.1 de Apple, licencia Apache 2.0, ~94 MB, se descarga una vez): pulsa *Seleccionar* y haz clic en una persona, el agua, un edificio… (⌥ clic quita una zona; *Deshacer clic* quita el último). Cada clic suma su propia zona, así se pueden juntar cosas distintas. Luego ajusta solo esa zona: exposición, contraste, saturación y temperatura.
-- **Cielo** (con el mismo modelo): *Luz del cielo* y *Realzar cielo* para el cielo de la foto, o **Cambiar cielo** por uno de los incluidos (despejado, con nubes, atardecer, hora dorada, tormenta) o por una foto de cielo tuya.
+- **Cielo** (con el mismo modelo): *Luz del cielo* y *Realzar cielo* para el cielo de la foto, o **Cambiar cielo** por uno de los incluidos (despejado, con nubes, atardecer, hora dorada, tormenta) o por una foto de cielo tuya: *Añadir fotos de cielo…* las guarda en **Mis cielos** (`~/Library/Application Support/Revela/Cielos/`) para usarlas con un clic; clic derecho para quitar una.
 - **Agua** (con el mismo modelo): *Marcar el agua* y un clic en el mar, lago o río. Luego **Color del cielo en el agua** (toma el color medio del cielo, el cambiado si lo cambiaste, y conserva olas y brillos), **Reflejo del cielo** y **Luz del agua**.
 - **Retrato** (detección de caras de macOS): **suavizar piel** (conserva textura), **ojos** más claros y nítidos y **dientes** más blancos, solo en las zonas de cada cara.
 - **Antes / después** (botón *Antes* o la tecla `\`), **Deshacer** (⌘Z) y **Restablecer** (⇧⌘R). Doble clic en el nombre de un control lo devuelve a cero.
 - **Exportar** (⌘E) en JPEG, HEIC, PNG o TIFF de 16 bits, a resolución completa.
 - **Ampliar con IA al exportar** (Real-ESRGAN, licencia BSD-3, conversión a Core ML de MLBoy, ~67 MB, se descarga una vez): ×2 o ×4 recuperando detalle y quitando ruido. Se procesa en mosaicos de 512 px que se solapan. Hasta 120 megapíxeles de salida (un RAW de 24 MP a ×2 tarda algo más de un minuto en un M5).
-- **Aplicar a varias fotos** (⇧⌘E): revela un lote de fotos con los mismos ajustes y las guarda en una carpeta.
+- **Copiar ajustes / Pegar ajustes** (⇧⌘C / ⇧⌘V, o los botones de arriba): lleva el revelado de una foto a otra. No se copian los clics de selección y de agua, los trazos de borrar ni el enderezado, porque dependen de dónde está cada cosa en cada foto; al pegar, la foto conserva los suyos.
+- **Aplicar a varias fotos** (⇧⌘E): revela un lote de fotos con los mismos ajustes (con el mismo criterio que *Copiar ajustes*) y las guarda en una carpeta.
 
 ## Lo que no hace (frente a Luminar)
 

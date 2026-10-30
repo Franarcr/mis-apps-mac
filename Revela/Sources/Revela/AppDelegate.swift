@@ -58,6 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item("Deshacer", #selector(undo), "z"),
             item("Ver el original", #selector(toggleOriginal), "\\", []),
             item("Restablecer ajustes", #selector(reset), "r", [.command, .shift]),
+            .separator(),
+            item("Copiar ajustes", #selector(copyAdjustments), "c", [.command, .shift]),
+            item("Pegar ajustes", #selector(pasteAdjustments), "v", [.command, .shift]),
         ])
         let windowItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Ventana")
@@ -74,4 +77,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func undo() { model.undo() }
     @objc private func toggleOriginal() { model.showOriginal.toggle() }
     @objc private func reset() { model.reset() }
+    @objc private func copyAdjustments() { model.copyAdjustments() }
+    @objc private func pasteAdjustments() { model.pasteAdjustments() }
 }
