@@ -163,11 +163,12 @@ enum SkyRefiner {
         // Cielo seguro: el interior de la máscara, alejado más de una celda del borde.
         let core = affine(coarse.clampedToExtent()
             .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: cell * 1.5]).cropped(to: extent), 10, -8.5)
-        // Franja dudosa: hasta dos celdas por fuera de la máscara.
+        // Franja dudosa: hasta seis celdas por fuera de la máscara. Tan ancha para llegar al cielo que se ve
+        // por dentro de rejillas y ramas (SAM las toma enteras como objeto); el color protege lo que no es cielo.
         let band = affine(coarse.clampedToExtent()
-            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: cell * 2]).cropped(to: extent), 4, -1)
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: cell * 6]).cropped(to: extent), 4, -1)
         // Color del cielo en cada zona: media del cielo seguro de alrededor (convolución normalizada).
-        let sigma = Double(cell * 3)
+        let sigma = Double(cell * 5)
         let weighted = photo.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: core])
         let num = weighted.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
         let den = core.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
