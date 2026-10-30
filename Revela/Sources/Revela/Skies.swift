@@ -48,7 +48,7 @@ enum Skies {
     /// Cambia o realza el cielo dentro de `mask`.
     static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage) -> CIImage {
         var sky = image
-        if let id = a.skyReplacement, let replacement = make(id, extent: image.extent) {
+        if let id = a.skyReplacement, let replacement = make(id, extent: image.extent, horizon: horizon(of: mask, in: image.extent)) {
             sky = a.skyAmount >= 100 ? replacement : Develop.mix(image, replacement, amount: a.skyAmount / 100)
         }
         if a.skyEnhance > 0 {
@@ -70,38 +70,65 @@ enum Skies {
 
     private static var fileCache: [String: CIImage] = [:]
 
-    static func make(_ id: String, extent: CGRect) -> CIImage? {
+    /// `horizon`: altura (en coordenadas de la foto) donde termina el cielo; el cielo nuevo se coloca con su
+    /// horizonte ahí. Sin ella, se supone a un 30 % desde abajo.
+    static func make(_ id: String, extent: CGRect, horizon: CGFloat? = nil) -> CIImage? {
+        let horizon = horizon ?? extent.minY + extent.height * 0.3
         switch id {
-        case "despejado": return gradient([(0, rgb(0.16, 0.38, 0.78)), (0.6, rgb(0.42, 0.65, 0.92)), (1, rgb(0.78, 0.88, 0.97))], extent)
+        case "despejado": return gradient([(0, rgb(0.16, 0.38, 0.78)), (0.6, rgb(0.42, 0.65, 0.92)), (1, rgb(0.78, 0.88, 0.97))], extent, horizon)
         case "nubes":
-            let base = gradient([(0, rgb(0.2, 0.42, 0.8)), (0.6, rgb(0.5, 0.7, 0.93)), (1, rgb(0.82, 0.9, 0.97))], extent)
+            let base = gradient([(0, rgb(0.2, 0.42, 0.8)), (0.6, rgb(0.5, 0.7, 0.93)), (1, rgb(0.82, 0.9, 0.97))], extent, horizon)
             return clouds(over: base, color: rgb(1, 1, 1), density: 0.55, extent: extent)
         case "atardecer":
             let base = gradient([(0, rgb(0.18, 0.2, 0.45)), (0.45, rgb(0.75, 0.38, 0.45)), (0.8, rgb(0.98, 0.6, 0.3)),
-                                 (1, rgb(1, 0.82, 0.5))], extent)
+                                 (1, rgb(1, 0.82, 0.5))], extent, horizon)
             return clouds(over: base, color: rgb(0.98, 0.7, 0.55), density: 0.35, extent: extent)
         case "dorado":
-            let base = gradient([(0, rgb(0.45, 0.55, 0.75)), (0.6, rgb(0.95, 0.8, 0.55)), (1, rgb(1, 0.9, 0.65))], extent)
+            let base = gradient([(0, rgb(0.45, 0.55, 0.75)), (0.6, rgb(0.95, 0.8, 0.55)), (1, rgb(1, 0.9, 0.65))], extent, horizon)
             return clouds(over: base, color: rgb(1, 0.93, 0.8), density: 0.4, extent: extent)
         case "tormenta":
-            let base = gradient([(0, rgb(0.15, 0.17, 0.22)), (0.7, rgb(0.35, 0.38, 0.45)), (1, rgb(0.55, 0.57, 0.62))], extent)
+            let base = gradient([(0, rgb(0.15, 0.17, 0.22)), (0.7, rgb(0.35, 0.38, 0.45)), (1, rgb(0.55, 0.57, 0.62))], extent, horizon)
             return clouds(over: base, color: rgb(0.62, 0.64, 0.7), density: 0.75, extent: extent)
         default:
             if fileCache[id] == nil { fileCache[id] = CIImage(contentsOf: URL(fileURLWithPath: id), options: [.applyOrientationProperty: true]) }
             guard let photo = fileCache[id] else { return nil }
-            // La foto del cielo llena el ancho y se alinea arriba (donde está el cielo de la foto).
-            let s = max(extent.width / photo.extent.width, extent.height / photo.extent.height)
+            // El horizonte del cielo (su borde de abajo) va un poco por debajo del horizonte de la foto, y el
+            // cielo cubre desde ahí hasta arriba; lo que sobre a los lados o arriba se recorta.
+            let bottom = horizon - extent.height * 0.03
+            let needed = max(extent.maxY - bottom, 1)
+            let s = max(extent.width / photo.extent.width, needed / photo.extent.height)
             let scaled = photo.transformed(by: CGAffineTransform(scaleX: s, y: s))
-            return scaled.transformed(by: CGAffineTransform(translationX: extent.minX - scaled.extent.minX,
-                                                            y: extent.maxY - scaled.extent.maxY)).cropped(to: extent)
+            return scaled
+                .transformed(by: CGAffineTransform(translationX: extent.midX - scaled.extent.midX, y: bottom - scaled.extent.minY))
+                .clampedToExtent()
+                .cropped(to: extent)
         }
+    }
+
+    private static let context = CIContext(options: [.cacheIntermediates: false])
+
+    /// Altura del horizonte: la fila más baja (en una versión de 64 filas) que aún es cielo en su mayoría.
+    static func horizon(of mask: CIImage, in extent: CGRect) -> CGFloat {
+        let rows = 64, cols = 32
+        let small = mask.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: CGFloat(cols) / extent.width, y: CGFloat(rows) / extent.height))
+        var pixels = [Float](repeating: 0, count: rows * cols * 4)
+        context.render(small, toBitmap: &pixels, rowBytes: cols * 16, bounds: CGRect(x: 0, y: 0, width: cols, height: rows),
+                       format: .RGBAf, colorSpace: nil)
+        // Fila 0 del mapa de bits = arriba. Se baja mientras más de un tercio de la fila sea cielo.
+        var lowest = 0
+        for row in 0..<rows {
+            let sky = (0..<cols).reduce(Float(0)) { $0 + pixels[(row * cols + $1) * 4] } / Float(cols)
+            if sky > 0.33 { lowest = row } else if row > lowest + 2 { break }
+        }
+        return extent.maxY - extent.height * CGFloat(lowest + 1) / CGFloat(rows)
     }
 
     private static func rgb(_ r: Double, _ g: Double, _ b: Double) -> CIColor { CIColor(red: r, green: g, blue: b) }
 
     /// Degradado vertical: posición 0 = arriba, 1 = a la altura del horizonte (a un tercio desde abajo);
     /// por debajo del horizonte sigue el último color.
-    private static func gradient(_ stops: [(Double, CIColor)], _ extent: CGRect) -> CIImage {
+    private static func gradient(_ stops: [(Double, CIColor)], _ extent: CGRect, _ horizon: CGFloat) -> CIImage {
         let rows = 256
         var pixels = [Float]()
         for row in 0..<rows {   // fila 0 = arriba
@@ -115,7 +142,7 @@ enum Skies {
         }
         let column = CIImage(bitmapData: Data(bytes: pixels, count: pixels.count * 4), bytesPerRow: 16,
                              size: CGSize(width: 1, height: rows), format: .RGBAf, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
-        let skyHeight = extent.height * 0.7
+        let skyHeight = max(extent.maxY - horizon, extent.height * 0.2)
         return column
             .transformed(by: CGAffineTransform(scaleX: extent.width, y: skyHeight / CGFloat(rows)))
             .transformed(by: CGAffineTransform(translationX: extent.minX, y: extent.maxY - skyHeight))

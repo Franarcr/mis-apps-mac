@@ -24,7 +24,7 @@ enum Water {
         if a.waterReflection > 0 {
             // El cielo reflejado: la foto volteada sobre la línea de horizonte (lo más bajo del cielo),
             // algo desenfocada y estirada en vertical, como en un agua con ondas.
-            let horizon = lowestSkyY(skyMask, extent: extent)
+            let horizon = Skies.horizon(of: skyMask, in: extent)
             let flipped = image
                 .transformed(by: CGAffineTransform(translationX: 0, y: -horizon))
                 .transformed(by: CGAffineTransform(scaleX: 1, y: -1.15))
@@ -47,17 +47,5 @@ enum Water {
         f.color0 = CIColor(red: 1, green: 1, blue: 1)
         f.color1 = CIColor(red: 0, green: 0, blue: 0)
         return f.outputImage!.cropped(to: extent)
-    }
-
-    /// Altura aproximada del horizonte: el borde inferior medio del cielo (con su media vertical).
-    private static func lowestSkyY(_ skyMask: CIImage, extent: CGRect) -> CGFloat {
-        // Media del cielo por filas no es posible sin leer píxeles; se usa la fracción de cielo de la foto:
-        // si el cielo ocupa el 60 % de arriba, el horizonte está al 40 % de la altura.
-        let context = CIContext(options: [.cacheIntermediates: false])
-        let avg = skyMask.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: extent)])
-        var pixel = [Float](repeating: 0, count: 4)
-        context.render(avg, toBitmap: &pixel, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-                       format: .RGBAf, colorSpace: nil)
-        return extent.minY + extent.height * CGFloat(1 - pixel[0])
     }
 }

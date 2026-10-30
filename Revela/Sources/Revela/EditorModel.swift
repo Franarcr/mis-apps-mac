@@ -9,6 +9,10 @@ final class EditorModel: ObservableObject {
     @Published var adjustments = Adjustments() {
         didSet {
             guard adjustments != oldValue else { return }
+            // Al elegir otro cielo, se ve entero (si no, se quedaba con la intensidad del anterior).
+            if adjustments.skyReplacement != oldValue.skyReplacement, adjustments.skyReplacement != nil, !restoring {
+                adjustments.skyAmount = 100
+            }
             recordUndo(oldValue)
             if adjustments.usesSubjectMask, mask == nil { computeMask() }
             if adjustments.usesFaces, faces == nil { detectFaces() }
