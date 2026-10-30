@@ -69,6 +69,9 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
             case "luz": a.skyLight = 0
             case "intensidad": a.skyAmount = 100
             case "borrado": a.erase = []
+            case "luces": a.highlights = 0
+            case "bruma": a.skyHaze = 0
+            case "cielo": a.skyReplacement = nil
             default: break
             }
         }

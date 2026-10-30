@@ -46,7 +46,8 @@ enum Skies {
     }
 
     /// Cambia o realza el cielo dentro de `mask`.
-    static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage) -> CIImage {
+    /// `subject`: las personas y objetos principales (Vision); no son lejanos, así que no reciben bruma.
+    static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage, subject: CIImage? = nil) -> CIImage {
         let extent = image.extent
         let replacement = a.skyReplacement.flatMap { make($0, extent: extent, horizon: horizon(of: mask, in: extent)) }
         // El cielo entra unos píxeles en los objetos: el borde claro que deja la mezcla de hoja y cielo viejo
@@ -64,9 +65,14 @@ enum Skies {
                 let amount = a.skyAmount / 100
                 let far = Develop.mix(image, replacement, amount: amount)
                 let near = Develop.mix(oldSky, replacement, amount: amount)
-                let open = threshold(mask.clampedToExtent()
-                    .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: grow * 3])
-                    .applyingGaussianBlur(sigma: Double(grow)).cropped(to: extent))
+                // Cielo abierto = zonas amplias (los huecos de un árbol o de una rejilla no lo son, aunque sean
+                // grandes: si no, unos toman un color y otros otro y quedan parches). Se calcula a 1/8 y el paso
+                // de una mezcla a la otra es gradual.
+                let small = CGAffineTransform(scaleX: 1.0 / 8, y: 1.0 / 8)
+                let open = threshold(mask.transformed(by: small).clampedToExtent()
+                    .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: extent.width / 40 / 8])
+                    .applyingGaussianBlur(sigma: Double(extent.width / 50 / 8))
+                    .transformed(by: small.inverted()).cropped(to: extent))
                 sky = Develop.blend(far, over: near, mask: open)
             }
         }
@@ -86,11 +92,15 @@ enum Skies {
         var ground = a.skyHarmonize > 0 ? harmonize(image, newSky: sky, mask: mask, amount: a.skyHarmonize / 100) : image
         // Sin cielo nuevo (solo luz o realce del cielo de la foto) basta con mezclar con la máscara.
         guard replacement != nil else { return Develop.blend(sky, over: ground, mask: mask) }
+        // Bruma y niebla son cosa de lo lejano: las personas de delante (aunque estén a la altura del
+        // horizonte o junto al cielo) no las reciben.
+        let unhazed = ground
         if a.skyHaze > 0 {
             ground = horizonHaze(ground, newSky: sky, mask: mask, horizon: horizon(of: mask, in: extent), amount: a.skyHaze / 100)
         }
         ground = liftFog(ground, newSky: localSky(sky, mask: mask), oldSky: oldSky, mask: mask,
                          horizon: horizon(of: mask, in: extent))
+        if let subject { ground = Develop.blend(unhazed, over: ground, mask: subject) }
         // Solo se crece junto a objetos gruesos (árboles, edificios): las estructuras finas (listones de las
         // aspas, cables, ramas sueltas) desaparecerían. Un objeto es grueso si sobrevive a una apertura.
         let notSky = mask.applyingFilter("CIColorInvert")
@@ -104,7 +114,12 @@ enum Skies {
         let thin = mask.clampedToExtent()
             .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: max(0.6, extent.width / 3500)])
             .cropped(to: extent)
-        let grown = Arith.mul(dilated, thick).applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: thin])
+        // Sobre las personas el cielo no crece (dejaría un halo claro alrededor de la cabeza).
+        var dilatedNearThick = Arith.mul(dilated, thick)
+        if let subject { dilatedNearThick = Arith.mul(dilatedNearThick, subject.applyingFilter("CIColorInvert").cropped(to: extent)) }
+        // Ni en el follaje: entre hojas y huecos dibujaría contornos del cielo nuevo alrededor de cada mata.
+        dilatedNearThick = Arith.mul(dilatedNearThick, Texture.map(image).applyingFilter("CIColorInvert").cropped(to: extent))
+        let grown = dilatedNearThick.applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: thin])
             .cropped(to: extent)
         return composite(sky, over: ground, oldSky: oldSky, mask: grown)
     }
@@ -138,7 +153,10 @@ enum Skies {
         f.color0 = CIColor(red: 1, green: 1, blue: 1)
         f.color1 = CIColor(red: 0, green: 0, blue: 0)
         let region = Arith.mul(near, f.outputImage!.cropped(to: extent))
-        let weight = Arith.mul(veil, region)
+        // Solo la niebla de verdad, que es lisa: en el follaje con mucho detalle (un árbol cercano con huecos)
+        // el parecido al cielo viene de los huecos, no de un velo, y teñirlo lo dejaría gris azulado.
+        let smooth = Texture.map(ground).applyingFilter("CIColorInvert").cropped(to: extent)
+        let weight = Arith.mul(Arith.mul(veil, region), smooth)
         return Arith.add(ground, Arith.mul(weight, Arith.sub(newSky, oldSky)))
             .applyingFilter("CIColorClamp").cropped(to: extent)
     }
@@ -276,7 +294,12 @@ enum Skies {
             return clouds(over: base, color: rgb(0.62, 0.64, 0.7), density: 0.75, extent: extent)
         default:
             if fileCache[id] == nil { fileCache[id] = CIImage(contentsOf: URL(fileURLWithPath: id), options: [.applyOrientationProperty: true]) }
-            guard let photo = fileCache[id] else { return nil }
+            guard let original = fileCache[id] else { return nil }
+            // Sin los bordes de la foto (a veces tienen un viñeteado o una línea oscura): por debajo del
+            // horizonte, donde la foto de cielo no llega, se prolonga su última fila, y esa fila ha de ser cielo.
+            let e = original.extent
+            let photo = original.cropped(to: CGRect(x: e.minX + e.width * 0.01, y: e.minY + e.height * 0.03,
+                                                    width: e.width * 0.98, height: e.height * 0.96))
             // El horizonte del cielo (su borde de abajo) va un poco por debajo del horizonte de la foto, y el
             // cielo cubre desde ahí hasta arriba; lo que sobre a los lados o arriba se recorta.
             let bottom = horizon - extent.height * 0.03

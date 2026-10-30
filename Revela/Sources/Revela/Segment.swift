@@ -139,7 +139,74 @@ extension SegmentModel {
         f.point1 = CGPoint(x: 0, y: horizon + extent.height * 0.03)
         f.color0 = CIColor(red: 1, green: 1, blue: 1)
         f.color1 = CIColor(red: 0, green: 0, blue: 0)
-        return Develop.blend(wide, over: soft, mask: f.outputImage!.cropped(to: extent)).cropped(to: extent)
+        let refined = Develop.blend(wide, over: soft, mask: f.outputImage!.cropped(to: extent)).cropped(to: extent)
+        return refined.applyingFilter("CIMaximumCompositing", parameters: [
+            kCIInputBackgroundImageKey: skyThroughFoliage(refined, photo: guide.cropped(to: extent), horizon: horizon),
+        ]).cropped(to: extent)
+    }
+
+    /// El cielo que asoma entre las hojas de un árbol grande: SAM toma el árbol entero y el ajuste del borde
+    /// solo llega a unos 100 px. Por encima del horizonte, cerca del cielo y donde hay mucho detalle (follaje),
+    /// lo que tiene el color del cielo de la zona es cielo. Las zonas lisas (fachadas, niebla, ropa) no entran.
+    private static let averageContext = CIContext(options: [.cacheIntermediates: false])
+
+    private static func skyThroughFoliage(_ sky: CIImage, photo: CIImage, horizon: CGFloat) -> CIImage {
+        let extent = sky.extent
+        func affine(_ x: CIImage, _ k: CGFloat, _ bias: CGFloat) -> CIImage {
+            x.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: k, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: k, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 0),
+            ]).applyingFilter("CIColorClamp").cropped(to: extent)
+        }
+        // Color del cielo en cada zona: media del cielo seguro de alrededor, calculada a 1/8 (es muy suave).
+        let small = CGAffineTransform(scaleX: 1.0 / 8, y: 1.0 / 8)
+        let core = affine(sky, 10, -9)
+        // (amplio: el interior de un árbol grande queda lejos del cielo despejado)
+        let sigma = Double(extent.width / 12 / 8)
+        let num = Arith.mul(photo, core).transformed(by: small).clampedToExtent().applyingGaussianBlur(sigma: sigma)
+        let den = core.transformed(by: small).clampedToExtent().applyingGaussianBlur(sigma: sigma)
+        let localSky = den.applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: 0.001, y: 0.001, z: 0.001, w: 1)])
+            .applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: num])
+            .transformed(by: small.inverted()).cropped(to: extent)
+        // Cerca del cielo: hasta un 1/4 del ancho de la foto (también calculado a 1/8).
+        let near = affine(den.transformed(by: small.inverted()).cropped(to: extent), 12, -0.1)
+        // Parecido estricto al cielo de la zona (diferencia media 0,04 → sí; 0,08 → no).
+        let third = CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0)
+        // Con el color medio de todo el cielo seguro (dentro de un árbol grande, el cielo de la zona sale de
+        // muy lejos y no es fiable), mezclado con el de la zona.
+        let area = CIVector(cgRect: extent)
+        func mean(_ image: CIImage) -> [Float] {
+            var p = [Float](repeating: 0, count: 4)
+            averageContext.render(image.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: area]), toBitmap: &p,
+                                  rowBytes: 16, bounds: CGRect(x: extent.minX, y: extent.minY, width: 1, height: 1),
+                                  format: .RGBAf, colorSpace: nil)
+            return p
+        }
+        let coreAmount = mean(core)[0]
+        guard coreAmount > 0.01 else { return CIImage(color: .black).cropped(to: extent) }
+        let skyMean = mean(Arith.mul(photo, core)).map { $0 / coreAmount }
+        let globalSky = CIImage(color: CIColor(red: CGFloat(skyMean[0]), green: CGFloat(skyMean[1]), blue: CGFloat(skyMean[2])))
+            .cropped(to: extent)
+        let skyColor = Develop.mix(localSky, globalSky, amount: 0.7)
+        let distance = photo.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: skyColor])
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": third, "inputGVector": third, "inputBVector": third, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ])
+        let similar = affine(distance, -1 / 0.04, 0.08 / 0.04)   // 0,04 → sí; 0,08 → no (más deja pasar rejillas con niebla)
+        // Follaje: zonas amplias con mucho detalle (se decide por zonas, no píxel a píxel: si no, quedan
+        // parches con medio cielo viejo y medio nuevo). Se calcula a 1/8.
+        let foliage = affine(Texture.map(photo).transformed(by: small).clampedToExtent()
+            .applyingGaussianBlur(sigma: Double(extent.width / 80 / 8))
+            .transformed(by: small.inverted()).cropped(to: extent), 4, -1.2)
+        // Por encima del horizonte (con un margen).
+        let f = CIFilter.linearGradient()
+        f.point0 = CGPoint(x: 0, y: horizon + extent.height * 0.02)
+        f.point1 = CGPoint(x: 0, y: horizon - extent.height * 0.04)
+        f.color0 = CIColor(red: 1, green: 1, blue: 1)
+        f.color1 = CIColor(red: 0, green: 0, blue: 0)
+        let above = f.outputImage!.cropped(to: extent)
+        return Arith.mul(Arith.mul(Arith.mul(similar, foliage), near), above).cropped(to: extent)
     }
 
     /// Deja solo las zonas unidas a la fila de arriba (y su borde suave); el resto, a cero.
@@ -278,6 +345,26 @@ enum EdgeRefiner {
 }
 
 /// Operaciones aritméticas por píxel con signo (Core Image trabaja en coma flotante).
+/// Cuánto detalle fino hay alrededor de cada píxel (0 = liso, como niebla o cielo; 1 = hojas, ramas).
+enum Texture {
+    static func map(_ image: CIImage) -> CIImage {
+        let extent = image.extent
+        let r = Double(max(1, extent.width / 1000))
+        let third = CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0)
+        let luma = image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": third, "inputGVector": third, "inputBVector": third, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ])
+        let smooth = luma.clampedToExtent().applyingGaussianBlur(sigma: r).cropped(to: extent)
+        let detail = luma.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: smooth])
+        let k: CGFloat = 12
+        return detail.clampedToExtent().applyingGaussianBlur(sigma: r * 4).cropped(to: extent)
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputBVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ]).applyingFilter("CIColorClamp").cropped(to: extent)
+    }
+}
+
 enum Arith {
     static func sub(_ a: CIImage, _ b: CIImage) -> CIImage {
         let negated = b.applyingFilter("CIColorMatrix", parameters: [

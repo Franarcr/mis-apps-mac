@@ -62,7 +62,8 @@ struct Adjustments: Codable, Equatable {
     var usesSelection: Bool { !selection.isEmpty }
     var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil || skyHarmonize > 0 || relight > 0 }
     var usesWater: Bool { !water.isEmpty }
-    var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
+    // Con un cielo nuevo, las personas y objetos principales quedan fuera de la bruma y del borde del cielo.
+    var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 || skyReplacement != nil }
     var usesFaces: Bool { skinSmoothing > 0 || eyes > 0 || teeth > 0 }
     var usesDepth: Bool { lensBlur > 0 || dehaze > 0 || relight > 0 }
 
@@ -141,7 +142,7 @@ enum Develop {
 
         // Cielo: se cambia o se realza antes de los ajustes generales, para que todo quede con el mismo tono.
         if let sky, a.usesSky {
-            img = Skies.apply(a, to: img, mask: sky)
+            img = Skies.apply(a, to: img, mask: sky, subject: mask)
         }
 
         // Agua: después del cielo, para tomar su color (el cambiado, si se cambió).
@@ -193,23 +194,26 @@ enum Develop {
             img = f.outputImage ?? img
         }
 
-        // Recuperar luces y abrir sombras de forma "inteligente"; lo demás, con una curva.
-        if a.highlights < 0 || a.shadows > 0 {
+        // Abrir sombras de forma "inteligente" (por zonas); lo demás, con una curva. Las luces se recuperan con la
+        // curva, no por zonas: el filtro por zonas deja un halo claro alrededor de lo oscuro junto a un cielo
+        // muy claro (cabezas, árboles).
+        if a.shadows > 0 {
             let f = CIFilter.highlightShadowAdjust()
             f.inputImage = img
-            f.highlightAmount = Float(1 + min(a.highlights, 0) / 100)
-            f.shadowAmount = Float(max(a.shadows, 0) / 100)
+            f.highlightAmount = 1
+            f.shadowAmount = Float(a.shadows / 100)
             f.radius = Float(max(1, 10 * scale))
             img = f.outputImage ?? img
         }
-        if a.highlights > 0 || a.shadows < 0 || a.whites != 0 || a.blacks != 0 {
+        if a.highlights != 0 || a.shadows < 0 || a.whites != 0 || a.blacks != 0 {
             let f = CIFilter.toneCurve()
             f.inputImage = img
+            let h = a.highlights / 100
             f.point0 = CGPoint(x: 0, y: max(0, a.blacks / 100 * 0.12))
             f.point1 = CGPoint(x: 0.25, y: 0.25 + min(a.shadows, 0) / 100 * 0.1 + min(a.blacks, 0) / 100 * 0.05)
-            f.point2 = CGPoint(x: 0.5, y: 0.5)
-            f.point3 = CGPoint(x: 0.75, y: 0.75 + max(a.highlights, 0) / 100 * 0.1 + max(a.whites, 0) / 100 * 0.04)
-            f.point4 = CGPoint(x: 1, y: 1 + min(a.whites, 0) / 100 * 0.12)
+            f.point2 = CGPoint(x: 0.5, y: 0.5 + min(h, 0) * 0.03)
+            f.point3 = CGPoint(x: 0.75, y: 0.75 + h * (h < 0 ? 0.12 : 0.1) + max(a.whites, 0) / 100 * 0.04)
+            f.point4 = CGPoint(x: 1, y: 1 + min(a.whites, 0) / 100 * 0.12 + min(h, 0) * 0.06)
             img = f.outputImage ?? img
         }
 
