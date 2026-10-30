@@ -6,7 +6,10 @@ struct EditorView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            canvas
+            VStack(spacing: 0) {
+                canvas
+                ProjectStrip(model: model)
+            }
             Divider()
             sidebar.frame(width: 300)
         }

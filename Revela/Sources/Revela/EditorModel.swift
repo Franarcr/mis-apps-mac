@@ -603,6 +603,256 @@ final class EditorModel: ObservableObject {
     private func saveEdits() {
         guard let photo, !restoring else { return }
         EditStore.save(adjustments, for: photo.url)
+        if currentProject?.photos.contains(photo.url.path) == true { editsRevision &+= 1 }
+    }
+
+    // MARK: Proyectos
+
+    @Published private(set) var projects = ProjectStore.load()
+    @Published var currentProjectID: UUID? = UserDefaults.standard.string(forKey: "proyectoActual").flatMap(UUID.init) {
+        didSet {
+            UserDefaults.standard.set(currentProjectID?.uuidString, forKey: "proyectoActual")
+            selectedPhotos = []
+            loadThumbnails()
+        }
+    }
+    /// Miniaturas del proyecto (ruta → imagen), que se van cargando en segundo plano.
+    @Published private(set) var thumbnails: [String: CGImage] = [:]
+
+    func loadThumbnails() {
+        for path in currentProject?.photos ?? [] where thumbnails[path] == nil {
+            Thumbnails.shared.load(URL(fileURLWithPath: path)) { [weak self] image in
+                guard let self, let image else { return }
+                MainActor.assumeIsolated { self.thumbnails[path] = image }
+            }
+        }
+    }
+    /// Fotos marcadas en la tira (rutas).
+    @Published var selectedPhotos: Set<String> = []
+    private var selectionAnchor: String?
+    @Published var showingSync = false
+    @Published var syncGroups: Set<SyncGroup> = [.light, .color, .detail, .looks]
+    /// Cambia cuando se guardan ajustes de fotos del proyecto (para refrescar las marcas de la tira).
+    @Published private(set) var editsRevision = 0
+
+    var currentProject: Project? { projects.first { $0.id == currentProjectID } }
+    var projectPhotos: [URL] {
+        (currentProject?.photos ?? []).map { URL(fileURLWithPath: $0) }
+    }
+
+    private func updateProject(_ change: (inout Project) -> Void) {
+        guard let index = projects.firstIndex(where: { $0.id == currentProjectID }) else { return }
+        change(&projects[index])
+        ProjectStore.save(projects)
+    }
+
+    private func askName(_ title: String, initial: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = initial
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Aceptar")
+        alert.addButton(withTitle: "Cancelar")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? nil : name
+    }
+
+    func newProject() {
+        guard let name = askName("Nombre del proyecto", initial: "Proyecto \(projects.count + 1)") else { return }
+        var project = Project(name: name)
+        // Si hay una foto abierta, el proyecto empieza con ella.
+        if let photo { project.photos = [photo.url.path] }
+        projects.append(project)
+        ProjectStore.save(projects)
+        currentProjectID = project.id
+    }
+
+    /// Proyecto con nombre y fotos dados (para pruebas en el modo de captura; no se guarda si es de solo lectura).
+    func makeProject(name: String, photos: [URL]) {
+        let project = Project(name: name, photos: photos.map(\.path))
+        projects.append(project)
+        ProjectStore.save(projects)
+        currentProjectID = project.id
+    }
+
+    func renameProject() {
+        guard let current = currentProject, let name = askName("Nuevo nombre", initial: current.name) else { return }
+        updateProject { $0.name = name }
+    }
+
+    func deleteProject() {
+        guard let current = currentProject else { return }
+        let alert = NSAlert()
+        alert.messageText = "¿Eliminar el proyecto «\(current.name)»?"
+        alert.informativeText = "Las fotos y sus ajustes no se tocan: solo se borra la lista."
+        alert.addButton(withTitle: "Eliminar")
+        alert.addButton(withTitle: "Cancelar")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        projects.removeAll { $0.id == current.id }
+        ProjectStore.save(projects)
+        currentProjectID = nil
+    }
+
+    func addPhotosToProject(folders: Bool) {
+        if currentProject == nil { newProject() }
+        guard currentProject != nil else { return }
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        if folders {
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.message = "Elige una o varias carpetas: se añaden todas sus fotos"
+        } else {
+            panel.allowedContentTypes = Photo.openableTypes
+            panel.message = "Elige las fotos que quieres añadir al proyecto"
+        }
+        guard panel.runModal() == .OK else { return }
+        var urls: [URL] = []
+        for url in panel.urls {
+            if folders {
+                let items = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+                urls += items.filter { Self.isPhoto($0) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            } else {
+                urls.append(url)
+            }
+        }
+        add(urls)
+    }
+
+    /// Añade fotos (también al soltarlas en la tira). Las que no tienen ajustes reciben los de base del proyecto.
+    func add(_ urls: [URL]) {
+        guard let project = currentProject else { return }
+        let existing = Set(project.photos)
+        let new = urls.map(\.path).filter { !existing.contains($0) }
+        guard !new.isEmpty else { return }
+        if let base = project.base {
+            for path in new where EditStore.load(for: URL(fileURLWithPath: path)) == nil {
+                EditStore.save(base, for: URL(fileURLWithPath: path))
+            }
+        }
+        updateProject { $0.photos += new }
+        loadThumbnails()
+        status = new.count == 1 ? "1 foto añadida" : "\(new.count) fotos añadidas"
+    }
+
+    nonisolated static func isPhoto(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return Photo.rawExtensions.contains(ext) || ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff"].contains(ext)
+    }
+
+    func removeSelectedFromProject() {
+        let removing = selectedPhotos
+        updateProject { $0.photos.removeAll { removing.contains($0) } }
+        selectedPhotos = []
+    }
+
+    func useCurrentAsProjectBase() {
+        guard photo != nil else { return }
+        updateProject { $0.base = adjustments.transferable }
+        status = "Estos ajustes serán la base de las fotos que añadas al proyecto"
+    }
+
+    /// Clic en una miniatura: abre la foto; ⌘ clic la marca o desmarca; ⇧ clic marca desde la última.
+    func clickThumbnail(_ url: URL) {
+        let flags = NSEvent.modifierFlags
+        let path = url.path
+        if flags.contains(.command) {
+            if selectedPhotos.contains(path) { selectedPhotos.remove(path) } else { selectedPhotos.insert(path) }
+            selectionAnchor = path
+        } else if flags.contains(.shift), let anchor = selectionAnchor ?? photo?.url.path,
+                  let a = currentProject?.photos.firstIndex(of: anchor), let b = currentProject?.photos.firstIndex(of: path) {
+            selectedPhotos.formUnion(currentProject!.photos[min(a, b)...max(a, b)])
+        } else {
+            selectedPhotos = [path]
+            selectionAnchor = path
+            if photo?.url.path != path { open(url) }
+        }
+    }
+
+    func selectAllInProject() { selectedPhotos = Set(currentProject?.photos ?? []) }
+
+    /// Foto siguiente (o anterior) del proyecto.
+    func step(_ offset: Int) {
+        let photos = projectPhotos
+        guard !photos.isEmpty else { return }
+        let index = photos.firstIndex { $0.path == photo?.url.path } ?? (offset > 0 ? -1 : photos.count)
+        let next = index + offset
+        guard photos.indices.contains(next) else { return }
+        selectedPhotos = [photos[next].path]
+        selectionAnchor = photos[next].path
+        open(photos[next])
+    }
+
+    /// Las marcadas sin la foto abierta (a las que se lleva algo desde ella).
+    private var otherSelected: [URL] {
+        selectedPhotos.filter { $0 != photo?.url.path }.sorted().map { URL(fileURLWithPath: $0) }
+    }
+
+    /// Lleva los grupos elegidos de la foto abierta a las marcadas.
+    func syncSelected() {
+        let targets = otherSelected
+        guard photo != nil, !targets.isEmpty, !syncGroups.isEmpty else { return }
+        for url in targets {
+            var target = EditStore.load(for: url) ?? Adjustments()
+            for group in syncGroups { group.copy(from: adjustments, to: &target) }
+            EditStore.save(target, for: url)
+        }
+        editsRevision += 1
+        status = targets.count == 1 ? "Ajustes sincronizados en 1 foto" : "Ajustes sincronizados en \(targets.count) fotos"
+    }
+
+    /// «Automático» de Luz en cada foto marcada (con sus propios ajustes de lo demás).
+    func autoLightSelected() {
+        let urls = selectedPhotos.sorted().map { URL(fileURLWithPath: $0) }
+        guard !urls.isEmpty else { return }
+        let current = photo?.url.path
+        busy = "Luz automática: 1 de \(urls.count)…"
+        Self.queue.async {
+            for (index, url) in urls.enumerated() {
+                DispatchQueue.main.async { self.busy = "Luz automática: \(index + 1) de \(urls.count)…" }
+                guard let photo = try? Photo(url: url) else { continue }
+                let start = EditStore.load(for: url) ?? Adjustments()
+                let result = AutoLight.adjust(start, render: { a in
+                    Develop.apply(a, to: photo.preview, mask: nil, scale: photo.previewScale)
+                }, context: Self.context)
+                DispatchQueue.main.async {
+                    if url.path == current {
+                        var a = self.adjustments
+                        AutoLight.Values(result).apply(to: &a)
+                        self.adjustments = a
+                    } else {
+                        var a = EditStore.load(for: url) ?? Adjustments()
+                        AutoLight.Values(result).apply(to: &a)
+                        EditStore.save(a, for: url)
+                    }
+                }
+            }
+            DispatchQueue.main.async {
+                self.busy = nil
+                self.editsRevision += 1
+                self.status = "Luz automática aplicada a \(urls.count) fotos"
+            }
+        }
+    }
+
+    /// Exporta las fotos marcadas, cada una con sus propios ajustes.
+    func exportSelected() {
+        let urls = selectedPhotos.sorted().map { URL(fileURLWithPath: $0) }
+        guard !urls.isEmpty else { return }
+        let folder = NSOpenPanel()
+        folder.canChooseDirectories = true
+        folder.canChooseFiles = false
+        folder.canCreateDirectories = true
+        folder.prompt = "Guardar aquí"
+        folder.message = "¿Dónde se guardan las \(urls.count) fotos reveladas?"
+        guard folder.runModal() == .OK, let destination = folder.url else { return }
+        let ext = exportFormat.fileExtension
+        run(photos: urls, ownSettings: true) { source in
+            destination.appendingPathComponent(source.deletingPathExtension().lastPathComponent + "-revelada." + ext)
+        }
     }
 
     // MARK: Exportar
@@ -637,9 +887,12 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    private func run(photos: [URL], to destination: @escaping (URL) -> URL) {
+    /// `ownSettings`: cada foto con sus propios ajustes guardados (exportar una selección del proyecto); si no,
+    /// todas con los de la foto abierta.
+    private func run(photos: [URL], ownSettings: Bool = false, to destination: @escaping (URL) -> URL) {
         let adjustments = adjustments, format = exportFormat, quality = exportQuality
         let current = photo?.url
+        let saved = Dictionary(uniqueKeysWithValues: photos.map { ($0.path, EditStore.load(for: $0) ?? Adjustments()) })
         let upscale = upscaleInstalled ? exportUpscale : 1
         busy = photos.count == 1 ? "Exportando…" : "Exportando 1 de \(photos.count)…"
         Self.queue.async {
@@ -651,7 +904,8 @@ final class EditorModel: ObservableObject {
                     let photo = try Photo(url: url)
                     let label = photos.count > 1 ? "Exportando \(index + 1) de \(photos.count)" : "Exportando"
                     // En las demás fotos no se usan los clics, trazos ni enderezado de esta.
-                    let settings = url == current ? adjustments : adjustments.transferable
+                    let settings = url == current ? adjustments
+                        : ownSettings ? (saved[url.path] ?? Adjustments()) : adjustments.transferable
                     try Exporter.export(photo, adjustments: settings, to: destination(url), format: format,
                                         quality: quality, upscale: upscale, context: Self.context) { progress in
                         DispatchQueue.main.async { self.busy = "\(label) · ampliando \(Int(progress * 100)) %…" }

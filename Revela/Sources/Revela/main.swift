@@ -256,7 +256,20 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
         let model = EditorModel()
         // --plegado: con algunas secciones plegadas (para ver cómo queda).
         if arguments.contains("--plegado") { model.collapsedSections = ["Inteligencia artificial", "Borrar objetos", "Selección con un clic", "Retrato"] }
-        if arguments.count > index + 2 {
+        // --proyecto carpeta: un proyecto temporal con las fotos de esa carpeta, la tercera abierta y tres marcadas.
+        if let p = arguments.firstIndex(of: "--proyecto"), arguments.count > p + 1 {
+            let folder = URL(fileURLWithPath: arguments[p + 1])
+            let photos = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+                .filter(EditorModel.isPhoto).sorted { $0.lastPathComponent < $1.lastPathComponent }
+            model.makeProject(name: folder.lastPathComponent, photos: photos)
+            if photos.count > 4 {
+                model.open(photos[2])
+                RunLoop.main.run(until: Date().addingTimeInterval(4))
+                model.selectedPhotos = Set(photos[2...4].map(\.path))
+            }
+            RunLoop.main.run(until: Date().addingTimeInterval(8))
+        }
+        if arguments.count > index + 2, !arguments[index + 2].hasPrefix("--") {
             model.open(URL(fileURLWithPath: arguments[index + 2]))
             RunLoop.main.run(until: Date().addingTimeInterval(2))
             if arguments.contains("--probar-auto") {

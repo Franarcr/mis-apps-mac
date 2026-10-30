@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.contentView = NSHostingView(rootView: EditorView(model: model))
         window.setFrameAutosaveName("RevelaVentana")
         if !window.setFrameUsingName("RevelaVentana") { window.center() }
+        model.loadThumbnails()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -63,6 +64,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item("Copiar ajustes", #selector(copyAdjustments), "c", [.command, .shift]),
             item("Pegar ajustes", #selector(pasteAdjustments), "v", [.command, .shift]),
         ])
+        let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!), right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
+        menu("Proyecto", [
+            item("Nuevo proyecto…", #selector(newProject), "n", [.command, .shift]),
+            item("Añadir fotos…", #selector(addPhotos), ""),
+            item("Añadir carpeta…", #selector(addFolder), ""),
+            .separator(),
+            item("Foto siguiente", #selector(nextPhoto), right),
+            item("Foto anterior", #selector(previousPhoto), left),
+            item("Marcar todas", #selector(markAll), "a", [.command, .shift]),
+            .separator(),
+            item("Sincronizar ajustes…", #selector(syncPhotos), "s", [.command, .shift]),
+            item("Luz automática en las marcadas", #selector(autoMarked), ""),
+            item("Exportar las marcadas…", #selector(exportMarked), ""),
+        ])
         let windowItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Ventana")
         windowMenu.addItem(withTitle: "Minimizar", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
@@ -107,6 +122,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openRecent(_ sender: NSMenuItem) { if let url = sender.representedObject as? URL { model.open(url) } }
     @objc private func clearRecents() { model.clearRecents() }
     @objc private func openPhoto() { model.chooseFile() }
+    @objc private func newProject() { model.newProject() }
+    @objc private func addPhotos() { model.addPhotosToProject(folders: false) }
+    @objc private func addFolder() { model.addPhotosToProject(folders: true) }
+    @objc private func nextPhoto() { model.step(1) }
+    @objc private func previousPhoto() { model.step(-1) }
+    @objc private func markAll() { model.selectAllInProject() }
+    @objc private func syncPhotos() { if model.photo != nil, !model.selectedPhotos.isEmpty { model.showingSync = true } }
+    @objc private func autoMarked() { model.autoLightSelected() }
+    @objc private func exportMarked() { model.exportSelected() }
     @objc private func exportPhoto() { model.export() }
     @objc private func exportBatch() { model.exportBatch() }
     @objc private func undo() { model.undo() }
