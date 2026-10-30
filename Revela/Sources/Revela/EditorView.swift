@@ -200,6 +200,8 @@ struct EditorView: View {
                     slider("Saturación", \.saturation, -100...100)
                 }
                 section("Detalle", icon: "camera.aperture") {
+                    slider("Textura", \.texture, -100...100)
+                        .help("Detalle fino de hojas, piel o tela; en negativo lo suaviza")
                     slider("Claridad", \.clarity, 0...100)
                     slider("Nitidez", \.sharpness, 0...100)
                     slider("Viñeta", \.vignette, 0...100)

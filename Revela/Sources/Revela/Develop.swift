@@ -17,6 +17,7 @@ struct Adjustments: Codable, Equatable {
     var vibrance: Double = 0
     var saturation: Double = 0
     // Detalle
+    var texture: Double = 0         // -100…100: detalle fino (hojas, piel, tela); negativo lo suaviza
     var clarity: Double = 0         // 0…100
     var sharpness: Double = 0       // 0…100
     // Efectos
@@ -74,7 +75,7 @@ struct Adjustments: Codable, Equatable {
         func read(_ key: CodingKeys, _ value: inout Double) { if let v = try? c.decode(Double.self, forKey: key) { value = v } }
         read(.exposure, &exposure); read(.contrast, &contrast); read(.highlights, &highlights); read(.shadows, &shadows)
         read(.whites, &whites); read(.blacks, &blacks); read(.temperature, &temperature); read(.tint, &tint)
-        read(.vibrance, &vibrance); read(.saturation, &saturation); read(.clarity, &clarity); read(.sharpness, &sharpness)
+        read(.vibrance, &vibrance); read(.saturation, &saturation); read(.clarity, &clarity); read(.texture, &texture); read(.sharpness, &sharpness)
         read(.vignette, &vignette); read(.lookAmount, &lookAmount); read(.straighten, &straighten)
         read(.backgroundBlur, &backgroundBlur); read(.subjectLight, &subjectLight); read(.backgroundLight, &backgroundLight)
         read(.lensBlur, &lensBlur); read(.skinSmoothing, &skinSmoothing); read(.eyes, &eyes); read(.teeth, &teeth)
@@ -225,6 +226,19 @@ enum Develop {
             f.inputImage = img
             f.amount = Float(a.vibrance / 100)
             img = f.outputImage ?? img
+        }
+
+        if a.texture != 0 {
+            // Textura: el detalle de tamaño medio (unos 4 px en una foto de 6000), entre la nitidez (bordes
+            // finos) y la claridad (contraste local amplio). Se realza o, en negativo, se suaviza.
+            let sigma = max(0.8, 4 * scale)
+            let base = img.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: extent)
+            let detail = Arith.sub(img, base)
+            let k = a.texture / 100 * (a.texture > 0 ? 1.6 : 0.8)
+            img = Arith.add(img, detail.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: CGFloat(k), y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: CGFloat(k), z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: CGFloat(k), w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ])).cropped(to: extent)
         }
 
         if a.clarity > 0 {

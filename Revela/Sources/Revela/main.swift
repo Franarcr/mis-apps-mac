@@ -84,6 +84,7 @@ if let i = arguments.firstIndex(of: "--revelar"), arguments.count > i + 2 {
         print(String(format: "Luz automática: exposición %+.2f, contraste %.0f, luces %.0f, sombras %.0f, blancos %.0f, negros %.0f",
                      a.exposure, a.contrast, a.highlights, a.shadows, a.whites, a.blacks))
     }
+    if let h = arguments.firstIndex(of: "--textura"), arguments.count > h + 1 { a.texture = Double(arguments[h + 1]) ?? 0 }
     if let h = arguments.firstIndex(of: "--neblina"), arguments.count > h + 1 { a.dehaze = Double(arguments[h + 1]) ?? 0 }
     if let h = arguments.firstIndex(of: "--reiluminar"), arguments.count > h + 1 { a.relight = Double(arguments[h + 1]) ?? 0 }
     // --agua x,y tono reflejo luz: prueba los ajustes de agua sin guardarlos.
