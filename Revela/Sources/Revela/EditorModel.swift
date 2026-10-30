@@ -107,6 +107,7 @@ final class EditorModel: ObservableObject {
     }
 
     func open(_ url: URL) {
+        autoLightUndo = nil
         busy = "Abriendo \(url.lastPathComponent)…"
         Self.queue.async {
             let result = Result { try Photo(url: url) }
@@ -181,9 +182,22 @@ final class EditorModel: ObservableObject {
     }
 
     /// «Automático» de Luz: corrige los seis controles midiendo la foto revelada con el resto de ajustes.
+    /// Pulsado otra vez (sin haber tocado la Luz entre medias), vuelve a los valores de antes.
     @Published var autoLighting = false
+    private var autoLightUndo: (before: AutoLight.Values, applied: AutoLight.Values)?
+    var autoLightApplied: Bool {
+        guard let undo = autoLightUndo else { return false }
+        return AutoLight.Values(adjustments) == undo.applied
+    }
     func autoLight() {
         guard let photo, !autoLighting else { return }
+        if autoLightApplied, let undo = autoLightUndo {
+            var a = adjustments
+            undo.before.apply(to: &a)
+            autoLightUndo = nil
+            adjustments = a
+            return
+        }
         autoLighting = true
         let start = adjustments, mask = mask, faces = faces, depth = depth
         let selection = selectionMask, sky = skyMask, water = waterMask
@@ -197,8 +211,9 @@ final class EditorModel: ObservableObject {
                 self.autoLighting = false
                 // Solo cambia la sección Luz (si mientras tanto se tocó otra cosa, se respeta).
                 var a = self.adjustments
-                a.exposure = result.exposure; a.contrast = result.contrast; a.highlights = result.highlights
-                a.shadows = result.shadows; a.whites = result.whites; a.blacks = result.blacks
+                let before = AutoLight.Values(a)
+                AutoLight.Values(result).apply(to: &a)
+                self.autoLightUndo = (before, AutoLight.Values(a))
                 self.adjustments = a
             }
         }

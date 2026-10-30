@@ -180,10 +180,15 @@ struct EditorView: View {
                         Button {
                             model.autoLight()
                         } label: {
-                            Label(model.autoLighting ? "Calculando…" : "Automático", systemImage: "wand.and.stars")
+                            if model.autoLightApplied {
+                                Label("Quitar automático", systemImage: "arrow.uturn.backward")
+                            } else {
+                                Label(model.autoLighting ? "Calculando…" : "Automático", systemImage: "wand.and.stars")
+                            }
                         }
                         .disabled(model.autoLighting || model.photo == nil)
-                        .help("Mide la foto y ajusta exposición, contraste, luces, sombras, blancos y negros como base de revelado")
+                        .help(model.autoLightApplied ? "Vuelve a los valores de Luz que había antes de «Automático»"
+                              : "Mide la foto y ajusta exposición, contraste, luces, sombras, blancos y negros como base de revelado")
                         Spacer()
                     }
                     slider("Exposición", \.exposure, -3...3, format: "%+.2f")

@@ -6,6 +6,19 @@ import Foundation
 /// en varias pasadas (cada control de Revela tiene su propia forma; midiendo el resultado no hace falta
 /// adivinar su efecto exacto).
 enum AutoLight {
+    /// Los seis valores de la sección Luz (para volver a los de antes de pulsar «Automático»).
+    struct Values: Equatable {
+        var exposure, contrast, highlights, shadows, whites, blacks: Double
+        init(_ a: Adjustments) {
+            exposure = a.exposure; contrast = a.contrast; highlights = a.highlights
+            shadows = a.shadows; whites = a.whites; blacks = a.blacks
+        }
+        func apply(to a: inout Adjustments) {
+            a.exposure = exposure; a.contrast = contrast; a.highlights = highlights
+            a.shadows = shadows; a.whites = whites; a.blacks = blacks
+        }
+    }
+
     /// Lo que se mide de una foto revelada (luminancia en sRGB, de 0 a 1).
     struct Stats {
         var p1 = 0.0, p5 = 0.0, p10 = 0.0, p30 = 0.0, p50 = 0.0, p95 = 0.0, p99 = 0.0

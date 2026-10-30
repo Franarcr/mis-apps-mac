@@ -237,6 +237,17 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
         if arguments.count > index + 2 {
             model.open(URL(fileURLWithPath: arguments[index + 2]))
             RunLoop.main.run(until: Date().addingTimeInterval(2))
+            if arguments.contains("--probar-auto") {
+                // Pulsa «Automático» dos veces y muestra la Luz en cada paso (el segundo debe devolverla).
+                @MainActor func luz() -> String { String(format: "exp %+.2f con %.0f luc %.0f som %.0f bla %.0f neg %.0f", model.adjustments.exposure,
+                                              model.adjustments.contrast, model.adjustments.highlights, model.adjustments.shadows,
+                                              model.adjustments.whites, model.adjustments.blacks) }
+                print("antes:     ", luz())
+                model.autoLight(); RunLoop.main.run(until: Date().addingTimeInterval(6))
+                print("automático:", luz(), model.autoLightApplied ? "(botón: Quitar automático)" : "")
+                model.autoLight(); RunLoop.main.run(until: Date().addingTimeInterval(1))
+                print("2.º clic:  ", luz(), model.autoLightApplied ? "" : "(botón: Automático)")
+            }
             if arguments.contains("--tal-cual") {
                 // Con los ajustes guardados de la foto, sin tocar nada.
             } else if arguments.contains("--con-borrado") {
