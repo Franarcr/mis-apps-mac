@@ -5,78 +5,13 @@ import Foundation
 /// Profundidad de la foto con Depth Anything V2 (versión de Apple para Core ML, licencia Apache 2.0).
 /// El modelo (~50 MB) no va dentro de la app: se descarga una vez desde Hugging Face.
 enum DepthModel {
-    static let name = "DepthAnythingV2SmallF16"
-    private static let base = "https://huggingface.co/apple/coreml-depth-anything-v2-small/resolve/main/\(name).mlpackage/"
-    private static let files = ["Manifest.json", "Data/com.apple.CoreML/model.mlmodel", "Data/com.apple.CoreML/weights/weight.bin"]
-
-    static var folder: URL {
-        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Revela/Modelos")
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder
-    }
-
-    /// Modelo ya compilado para este Mac.
-    private static var compiledURL: URL { folder.appendingPathComponent("\(name).mlmodelc") }
-    static var isInstalled: Bool { FileManager.default.fileExists(atPath: compiledURL.path) }
-
-    /// Descarga y compila el modelo. `progress` recibe 0…1. Bloquea: llamar fuera del hilo principal.
-    static func install(progress: @escaping (Double) -> Void) throws {
-        let package = folder.appendingPathComponent("\(name).mlpackage")
-        try? FileManager.default.removeItem(at: package)
-        for (index, file) in files.enumerated() {
-            guard let url = URL(string: base + file) else { continue }
-            let destination = package.appendingPathComponent(file)
-            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let semaphore = DispatchSemaphore(value: 0)
-            var failure: Error?
-            let task = URLSession.shared.downloadTask(with: url) { temp, response, error in
-                defer { semaphore.signal() }
-                if let error { failure = error; return }
-                guard (response as? HTTPURLResponse)?.statusCode == 200, let temp else {
-                    failure = URLError(.badServerResponse); return
-                }
-                do { try FileManager.default.moveItem(at: temp, to: destination) } catch { failure = error }
-            }
-            let observation = task.progress.observe(\.fractionCompleted) { p, _ in
-                progress((Double(index) + p.fractionCompleted) / Double(files.count))
-            }
-            task.resume()
-            semaphore.wait()
-            observation.invalidate()
-            if let failure { throw failure }
-        }
-        // Core ML compila el modelo para el chip de este Mac (no hace falta Xcode).
-        let compiled = try MLModel.compileModel(at: package)
-        try? FileManager.default.removeItem(at: compiledURL)
-        try FileManager.default.moveItem(at: compiled, to: compiledURL)
-        try? FileManager.default.removeItem(at: package)
-    }
-
-    private static var loaded: MLModel?
-
-    private static func model() throws -> MLModel {
-        if let loaded { return loaded }
-        let config = MLModelConfiguration()
-        config.computeUnits = .all
-        let model = try MLModel(contentsOf: compiledURL, configuration: config)
-        loaded = model
-        return model
-    }
+    static let remote = RemoteModel(repo: "apple/coreml-depth-anything-v2-small", name: "DepthAnythingV2SmallF16")
+    static var isInstalled: Bool { remote.isInstalled }
+    static func install(progress: @escaping (Double) -> Void) throws { try remote.install(progress: progress) }
+    private static func model() throws -> MLModel { try remote.load() }
 
     /// Descripción de entradas y salidas (para comprobar el modelo).
-    static func describe() -> String {
-        guard let model = try? model() else { return "modelo no instalado" }
-        let d = model.modelDescription
-        func list(_ items: [String: MLFeatureDescription]) -> String {
-            items.values.map { f in
-                if let c = f.imageConstraint { return "\(f.name): imagen \(c.pixelsWide)×\(c.pixelsHigh) formato \(c.pixelFormatType)" }
-                if let c = f.multiArrayConstraint { return "\(f.name): matriz \(c.shape)" }
-                return "\(f.name): \(f.type.rawValue)"
-            }.joined(separator: "; ")
-        }
-        return "entradas: \(list(d.inputDescriptionsByName)) · salidas: \(list(d.outputDescriptionsByName))"
-    }
+    static func describe() -> String { remote.describe() }
 
     /// Mapa de profundidad del tamaño de `image`: blanco = cerca, negro = lejos.
     static func depthMap(for image: CIImage, context: CIContext) -> CIImage? {
@@ -119,8 +54,7 @@ enum DepthModel {
         for i in 0..<values.count { values[i] = array[i].floatValue }
         let data = Data(bytes: values, count: values.count * 4)
         return CIImage(bitmapData: data, bytesPerRow: width * 4, size: CGSize(width: width, height: height),
-                       format: .Rf, colorSpace: nil)
-            .transformed(by: CGAffineTransform(scaleX: 1, y: -1).translatedBy(x: 0, y: -CGFloat(height)))
+                       format: .Rf, colorSpace: nil) // la fila 0 de los datos es la de arriba
     }
 
     /// Lleva los valores a 0…1 (el modelo da una profundidad relativa sin unidades).

@@ -13,6 +13,8 @@ final class EditorModel: ObservableObject {
             if adjustments.usesSubjectMask, mask == nil { computeMask() }
             if adjustments.usesFaces, faces == nil { detectFaces() }
             if adjustments.usesDepth, depth == nil { computeDepth() }
+            if adjustments.selection != oldValue.selection { updateSelectionMask() }
+            if adjustments.usesSky, skyMask == nil { computeSkyMask() }
             scheduleRender()
             saveEdits()
         }
@@ -43,6 +45,12 @@ final class EditorModel: ObservableObject {
     private var depth: DepthInfo?
     private var computingDepth = false
     @Published private(set) var depthInstalled = DepthModel.isInstalled
+    @Published private(set) var segmentInstalled = SegmentModel.isInstalled
+    /// Modo «seleccionar con un clic»: los clics en la foto añaden puntos y se ve la zona elegida.
+    @Published var selecting = false { didSet { scheduleRender() } }
+    private var embedding: SegmentModel.Embedding?
+    private var selectionMask: CIImage?
+    private var skyMask: CIImage?
     private var rendering = false
     private var renderAgain = false
     private var undoStack: [Adjustments] = []
@@ -74,6 +82,10 @@ final class EditorModel: ObservableObject {
                     self.mask = nil
                     self.faces = nil
                     self.depth = nil
+                    self.embedding = nil
+                    self.selectionMask = nil
+                    self.skyMask = nil
+                    self.selecting = false
                     self.undoStack = []
                     self.restoring = true
                     self.adjustments = EditStore.load(for: url) ?? Adjustments()
@@ -82,6 +94,8 @@ final class EditorModel: ObservableObject {
                     if self.adjustments.usesSubjectMask { self.computeMask() }
                     if self.adjustments.usesFaces { self.detectFaces() }
                     if self.adjustments.usesDepth { self.computeDepth() }
+                    if self.adjustments.usesSelection { self.updateSelectionMask() }
+                    if self.adjustments.usesSky { self.computeSkyMask() }
                     self.scheduleRender()
                 case .failure(let error):
                     self.status = error.localizedDescription
@@ -97,9 +111,16 @@ final class EditorModel: ObservableObject {
         if rendering { renderAgain = true; return }
         rendering = true
         let adjustments = adjustments, mask = mask, faces = faces, depth = depth
+        let selection = selectionMask, sky = skyMask, overlay = selecting ? selectionMask : nil
         Self.queue.async {
-            let output = Develop.apply(adjustments, to: photo.preview, mask: mask, faces: faces, depth: depth,
-                                       scale: photo.previewScale)
+            var output = Develop.apply(adjustments, to: photo.preview, mask: mask, faces: faces, depth: depth,
+                                       selection: selection, sky: sky, scale: photo.previewScale)
+            if let overlay {
+                // Mientras se selecciona, la zona elegida se tiñe de naranja.
+                let tint = CIImage(color: CIColor(red: 1, green: 0.45, blue: 0.1, alpha: 0.45)).cropped(to: output.extent)
+                let tinted = tint.composited(over: output)
+                output = Develop.blend(tinted, over: output, mask: overlay)
+            }
             let image = Self.context.createCGImage(output, from: output.extent)
             DispatchQueue.main.async {
                 self.rendered = image
@@ -186,11 +207,98 @@ final class EditorModel: ObservableObject {
                     self.depthInstalled = true
                     self.status = "Modelo de profundidad instalado"
                     if self.adjustments.usesDepth { self.computeDepth() }
+                    if self.adjustments.usesSelection { self.updateSelectionMask() }
+                    if self.adjustments.usesSky { self.computeSkyMask() }
                 case .failure(let error):
                     self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"
                 }
             }
         }
+    }
+
+    // MARK: Seleccionar con un clic (SAM 2.1)
+
+    /// El codificador de SAM se ejecuta una vez por foto; luego cada clic tarda una décima.
+    private func withEmbedding(_ work: @escaping (SegmentModel.Embedding, Photo) -> Void) {
+        guard let photo, segmentInstalled else { return }
+        if let embedding { Self.queue.async { work(embedding, photo) }; return }
+        busy = "Analizando la foto…"
+        Self.queue.async {
+            let embedding = SegmentModel.encode(photo.preview, context: Self.context)
+            DispatchQueue.main.async {
+                self.busy = nil
+                guard self.photo === photo else { return }
+                self.embedding = embedding
+                if let embedding { Self.queue.async { work(embedding, photo) } }
+                else { self.status = "No se pudo analizar la foto para seleccionar." }
+            }
+        }
+    }
+
+    private func updateSelectionMask() {
+        let points = adjustments.selection
+        guard !points.isEmpty else { selectionMask = nil; scheduleRender(); return }
+        withEmbedding { embedding, photo in
+            let mask = SegmentModel.mask(embedding, points: points, extent: photo.preview.extent)
+            DispatchQueue.main.async {
+                guard self.photo === photo, self.adjustments.selection == points else { return }
+                self.selectionMask = mask
+                self.scheduleRender()
+            }
+        }
+    }
+
+    private func computeSkyMask() {
+        guard segmentInstalled else { return }
+        withEmbedding { embedding, photo in
+            let mask = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: photo.preview.extent, connectedToTop: true)
+            DispatchQueue.main.async {
+                guard self.photo === photo else { return }
+                self.skyMask = mask
+                if mask == nil { self.status = "No se encontró cielo en esta foto." }
+                self.scheduleRender()
+            }
+        }
+    }
+
+    /// Clic en la foto (0…1, origen abajo a la izquierda). Con ⌥ quita esa zona de la selección.
+    func addSelectionPoint(x: Double, y: Double, include: Bool) {
+        adjustments.selection.append(SelectionPoint(x: x, y: y, include: include))
+    }
+
+    func clearSelection() {
+        adjustments.selection = []
+        adjustments.selExposure = 0; adjustments.selContrast = 0; adjustments.selSaturation = 0; adjustments.selTemperature = 0
+    }
+
+    func installSegmentModel() {
+        busy = "Descargando el modelo de selección… 0 %"
+        Self.queue.async {
+            let result = Result {
+                try SegmentModel.install { progress in
+                    DispatchQueue.main.async { self.busy = "Descargando el modelo de selección… \(Int(progress * 100)) %" }
+                }
+            }
+            DispatchQueue.main.async {
+                self.busy = nil
+                switch result {
+                case .success:
+                    self.segmentInstalled = true
+                    self.status = "Modelo de selección instalado"
+                    if self.adjustments.usesSky { self.computeSkyMask() }
+                    if self.adjustments.usesSelection { self.updateSelectionMask() }
+                case .failure(let error):
+                    self.status = "No se pudo descargar el modelo: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    func chooseSkyPhoto() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = Photo.openableTypes
+        panel.message = "Elige una foto de cielo"
+        if panel.runModal() == .OK, let url = panel.url { adjustments.skyReplacement = url.path }
     }
 
     func straightenHorizon() {

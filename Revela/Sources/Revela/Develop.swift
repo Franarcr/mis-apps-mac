@@ -34,7 +34,20 @@ struct Adjustments: Codable, Equatable {
     var skinSmoothing: Double = 0   // 0…100
     var eyes: Double = 0            // 0…100
     var teeth: Double = 0           // 0…100
+    // Selección con un clic (SAM): dónde se hizo clic y los ajustes de esa zona
+    var selection: [SelectionPoint] = []
+    var selExposure: Double = 0     // -100…100
+    var selContrast: Double = 0
+    var selSaturation: Double = 0
+    var selTemperature: Double = 0
+    // Cielo
+    var skyLight: Double = 0        // -100…100
+    var skyEnhance: Double = 0      // 0…100
+    var skyReplacement: String?     // cielo incluido o ruta de una foto de cielo
+    var skyAmount: Double = 100
 
+    var usesSelection: Bool { !selection.isEmpty }
+    var usesSky: Bool { skyLight != 0 || skyEnhance > 0 || skyReplacement != nil }
     var usesSubjectMask: Bool { backgroundBlur > 0 || subjectLight != 0 || backgroundLight != 0 }
     var usesFaces: Bool { skinSmoothing > 0 || eyes > 0 || teeth > 0 }
     var usesDepth: Bool { lensBlur > 0 }
@@ -52,6 +65,10 @@ struct Adjustments: Codable, Equatable {
         read(.vignette, &vignette); read(.lookAmount, &lookAmount); read(.straighten, &straighten)
         read(.backgroundBlur, &backgroundBlur); read(.subjectLight, &subjectLight); read(.backgroundLight, &backgroundLight)
         read(.lensBlur, &lensBlur); read(.skinSmoothing, &skinSmoothing); read(.eyes, &eyes); read(.teeth, &teeth)
+        read(.selExposure, &selExposure); read(.selContrast, &selContrast); read(.selSaturation, &selSaturation)
+        read(.selTemperature, &selTemperature); read(.skyLight, &skyLight); read(.skyEnhance, &skyEnhance); read(.skyAmount, &skyAmount)
+        selection = (try? c.decode([SelectionPoint].self, forKey: .selection)) ?? []
+        skyReplacement = try? c.decode(String.self, forKey: .skyReplacement)
         look = try? c.decode(String.self, forKey: .look)
         autoEnhance = (try? c.decode(Bool.self, forKey: .autoEnhance)) ?? false
     }
@@ -63,7 +80,8 @@ enum Develop {
     /// `mask`: máscara del sujeto (blanco = sujeto) del mismo tamaño que `image`, si hace falta.
     /// `scale`: tamaño relativo a la foto completa (para que radios y texturas se vean igual en la vista previa).
     static func apply(_ a: Adjustments, to image: CIImage, mask: CIImage?, faces: FaceMasks? = nil,
-                      depth: DepthInfo? = nil, scale: Double) -> CIImage {
+                      depth: DepthInfo? = nil, selection: CIImage? = nil, sky: CIImage? = nil,
+                      scale: Double) -> CIImage {
         var img = image
         let extent = image.extent
 
@@ -79,6 +97,33 @@ enum Develop {
             if a.skinSmoothing > 0 { img = Retouch.smoothSkin(img, masks: faces, amount: a.skinSmoothing, scale: scale) }
             if a.eyes > 0 { img = Retouch.brightenEyes(img, masks: faces, amount: a.eyes) }
             if a.teeth > 0 { img = Retouch.whitenTeeth(img, masks: faces, amount: a.teeth) }
+        }
+
+        // Cielo: se cambia o se realza antes de los ajustes generales, para que todo quede con el mismo tono.
+        if let sky, a.usesSky {
+            img = Skies.apply(a, to: img, mask: sky)
+        }
+
+        // Ajustes solo en la zona seleccionada con un clic.
+        if let selection, a.selExposure != 0 || a.selContrast != 0 || a.selSaturation != 0 || a.selTemperature != 0 {
+            var local = img
+            if a.selExposure != 0 { local = exposure(local, ev: a.selExposure / 100 * 1.5) }
+            if a.selTemperature != 0 {
+                let f = CIFilter.temperatureAndTint()
+                f.inputImage = local
+                f.neutral = CIVector(x: 6500, y: 0)
+                f.targetNeutral = CIVector(x: 6500 + a.selTemperature * 30, y: 0)
+                local = f.outputImage ?? local
+            }
+            if a.selContrast != 0 || a.selSaturation != 0 {
+                let f = CIFilter.colorControls()
+                f.inputImage = local
+                f.contrast = Float(1 + a.selContrast / 250)
+                f.saturation = Float(1 + a.selSaturation / 100)
+                f.brightness = 0
+                local = f.outputImage ?? local
+            }
+            img = blend(local, over: img, mask: selection)
         }
 
         // Luz del sujeto y del fondo (con la máscara de la IA), antes del resto para que el color se aplique igual.

@@ -107,7 +107,17 @@ enum Exporter {
         let mask = adjustments.usesSubjectMask || adjustments.usesDepth ? Intelligence.subjectMask(for: full, context: context) : nil
         let faces = adjustments.usesFaces ? FaceMasks.detect(in: full, context: context) : nil
         let depth = adjustments.usesDepth ? DepthInfo.compute(for: full, subject: mask, context: context) : nil
-        let output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth, scale: 1)
+        var selection: CIImage?, sky: CIImage?
+        if adjustments.usesSelection || adjustments.usesSky, let embedding = SegmentModel.encode(full, context: context) {
+            if adjustments.usesSelection {
+                selection = SegmentModel.mask(embedding, points: adjustments.selection, extent: full.extent)
+            }
+            if adjustments.usesSky {
+                sky = SegmentModel.mask(embedding, points: SegmentModel.skyPoints, extent: full.extent, connectedToTop: true)
+            }
+        }
+        let output = Develop.apply(adjustments, to: full, mask: mask, faces: faces, depth: depth,
+                                   selection: selection, sky: sky, scale: 1)
         let space = CGColorSpace(name: CGColorSpace.displayP3)!
         let options: [CIImageRepresentationOption: Any] = [
             CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality,

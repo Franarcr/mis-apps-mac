@@ -12,7 +12,12 @@ if let index = arguments.firstIndex(of: "--prueba"), arguments.count > index + 2
         a.temperature = 10; a.vignette = 25; a.sharpness = 30
         a.backgroundBlur = arguments.contains("--lente") ? 0 : 60; a.subjectLight = 25; a.backgroundLight = -20
         if arguments.contains("--lente") { a.lensBlur = 80 }
-        a.look = arguments.count > index + 3 && !arguments[index + 3].hasPrefix("--") ? arguments[index + 3] : "cine"
+        if let i = arguments.firstIndex(of: "--cielo"), arguments.count > i + 1 {
+            a = Adjustments(); a.skyReplacement = arguments[i + 1]; a.skyEnhance = 20; a.vibrance = 20
+        }
+        if !arguments.contains("--cielo") {
+            a.look = arguments.count > index + 3 && !arguments[index + 3].hasPrefix("--") ? arguments[index + 3] : "cine"
+        }
         a.lookAmount = 70
         let context = CIContext()
         let start = Date()
@@ -45,6 +50,44 @@ if arguments.contains("--profundidad") {
     exit(0)
 }
 
+if arguments.contains("--seleccion") {
+    // Descarga SAM 2.1 si falta y muestra entradas y salidas de sus tres partes.
+    if !SegmentModel.isInstalled {
+        var last = -1
+        do {
+            try SegmentModel.install { p in
+                let percent = Int(p * 100)
+                if percent / 10 != last / 10 { last = percent; print("Descargando… \(percent) %") }
+            }
+        } catch {
+            print("Error: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+    SegmentModel.all.forEach { print($0.describe()) }
+    // Revela --seleccion foto salida-prefijo x,y [x,y…]: guarda la máscara de esos clics (0…1, origen abajo-izquierda).
+    if let index = arguments.firstIndex(of: "--seleccion"), arguments.count > index + 3 {
+        let context = CIContext()
+        guard let photo = try? Photo(url: URL(fileURLWithPath: arguments[index + 1])) else { exit(1) }
+        var start = Date()
+        guard let embedding = SegmentModel.encode(photo.preview, context: context) else { print("No se pudo codificar"); exit(1) }
+        print(String(format: "Codificada en %.2f s", Date().timeIntervalSince(start)))
+        let points = arguments[(index + 3)...].map { arg -> SelectionPoint in
+            let v = arg.split(separator: ",").compactMap { Double($0) }
+            return SelectionPoint(x: v[0], y: v[1])
+        }
+        start = Date()
+        guard let mask = SegmentModel.mask(embedding, points: points, extent: photo.preview.extent) else { print("Sin máscara"); exit(1) }
+        print(String(format: "Máscara en %.2f s", Date().timeIntervalSince(start)))
+        // Vista de comprobación: lo seleccionado en color y lo demás oscurecido.
+        let dark = Develop.exposure(photo.preview, ev: -2)
+        let view = Develop.blend(photo.preview, over: dark, mask: mask)
+        try? context.writeJPEGRepresentation(of: view, to: URL(fileURLWithPath: arguments[index + 2]),
+                                             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+    exit(0)
+}
+
 if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 1 {
     // Dibuja la ventana en un PNG para revisar el diseño: Revela --captura salida.png [foto]
     MainActor.assumeIsolated {
@@ -55,7 +98,9 @@ if let index = arguments.firstIndex(of: "--captura"), arguments.count > index + 
             RunLoop.main.run(until: Date().addingTimeInterval(2))
             model.adjustments.vibrance = 30
             model.adjustments.look = "cine"
-            model.adjustments.backgroundBlur = 50
+            model.adjustments.skyReplacement = "nubes"
+            model.adjustments.selection = [SelectionPoint(x: 0.46, y: 0.42)]
+            model.selecting = true
         }
         RunLoop.main.run(until: Date().addingTimeInterval(3))
         let view = NSHostingView(rootView: EditorView(model: model))

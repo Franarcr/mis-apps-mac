@@ -21,11 +21,20 @@ struct EditorView: View {
         ZStack {
             Color(white: 0.07)
             if let image = model.showOriginal ? model.original : model.rendered {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-                    .padding(24)
+                GeometryReader { geo in
+                    let rect = fitted(CGSize(width: image.width, height: image.height), in: geo.size, margin: 24)
+                    Image(decorative: image, scale: 1)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: rect.width, height: rect.height)
+                        .contentShape(Rectangle())
+                        .gesture(SpatialTapGesture().onEnded { tap in
+                            guard model.selecting else { return }
+                            model.addSelectionPoint(x: tap.location.x / rect.width, y: 1 - tap.location.y / rect.height,
+                                                    include: !NSEvent.modifierFlags.contains(.option))
+                        })
+                        .position(x: rect.midX, y: rect.midY)
+                }
             } else if model.busy == nil {
                 VStack(spacing: 14) {
                     Image(systemName: "photo.on.rectangle.angled").font(.system(size: 54, weight: .light))
@@ -37,6 +46,12 @@ struct EditorView: View {
             }
             VStack {
                 toolbar
+                if model.selecting {
+                    Text("Haz clic en lo que quieras seleccionar · ⌥ clic para quitar una zona")
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.orange.opacity(0.85), in: Capsule())
+                }
                 Spacer()
                 statusBar
             }
@@ -117,6 +132,8 @@ struct EditorView: View {
                     Text("Usa la IA de macOS, sin internet: detecta personas, animales y objetos principales.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
+                section("Selección con un clic", icon: "hand.point.up.left") { selectionControls }
+                section("Cielo", icon: "cloud.sun") { skyControls }
                 section("Retrato", icon: "face.smiling") {
                     slider("Suavizar piel", \.skinSmoothing, 0...100)
                     slider("Ojos", \.eyes, 0...100)
@@ -161,6 +178,81 @@ struct EditorView: View {
             .opacity(model.photo == nil ? 0.5 : 1)
         }
         .font(.callout)
+    }
+
+    private var downloadSegmentButton: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button("Descargar selección inteligente (94 MB)…") { model.installSegmentModel() }
+            Text("Modelo SAM 2.1 de Apple: selecciona cualquier cosa con un clic y encuentra el cielo.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var selectionControls: some View {
+        if model.segmentInstalled {
+            HStack {
+                Toggle(model.selecting ? "Seleccionando…" : "Seleccionar", isOn: $model.selecting)
+                    .toggleStyle(.button)
+                    .tint(.orange)
+                if !model.adjustments.selection.isEmpty {
+                    Button("Quitar") { model.clearSelection() }
+                }
+            }
+            if model.adjustments.selection.isEmpty {
+                Text("Pulsa «Seleccionar» y haz clic en una persona, el agua, un edificio… para ajustar solo esa zona.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            } else {
+                slider("Exposición", \.selExposure, -100...100)
+                slider("Contraste", \.selContrast, -100...100)
+                slider("Saturación", \.selSaturation, -100...100)
+                slider("Temperatura", \.selTemperature, -100...100)
+            }
+        } else {
+            downloadSegmentButton
+        }
+    }
+
+    @ViewBuilder private var skyControls: some View {
+        if model.segmentInstalled {
+            slider("Luz del cielo", \.skyLight, -100...100)
+            slider("Realzar cielo", \.skyEnhance, 0...100)
+            Text("Cambiar cielo").foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 82), spacing: 6)], spacing: 6) {
+                ForEach([Skies.Sky(id: "", name: "Original")] + Skies.builtIn) { sky in
+                    chip(sky.name, selected: (model.adjustments.skyReplacement ?? "") == sky.id) {
+                        model.adjustments.skyReplacement = sky.id.isEmpty ? nil : sky.id
+                    }
+                }
+            }
+            if let custom = model.adjustments.skyReplacement, !Skies.builtIn.contains(where: { $0.id == custom }) {
+                Text("Cielo: \(Skies.name(of: custom))").font(.caption)
+            }
+            Button("Usar una foto de cielo…") { model.chooseSkyPhoto() }
+            if model.adjustments.skyReplacement != nil { slider("Intensidad del cielo", \.skyAmount, 0...100) }
+        } else {
+            downloadSegmentButton
+        }
+    }
+
+    private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Color.accentColor.opacity(0.35) : Color.white.opacity(0.07)))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(selected ? Color.accentColor : .clear))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Rectángulo donde se dibuja la foto, centrada y entera dentro del espacio disponible.
+    private func fitted(_ size: CGSize, in area: CGSize, margin: CGFloat) -> CGRect {
+        let w = max(area.width - margin * 2, 1), h = max(area.height - margin * 2, 1)
+        let s = min(w / size.width, h / size.height)
+        let fit = CGSize(width: size.width * s, height: size.height * s)
+        return CGRect(x: (area.width - fit.width) / 2, y: (area.height - fit.height) / 2, width: fit.width, height: fit.height)
     }
 
     private var looks: some View {
