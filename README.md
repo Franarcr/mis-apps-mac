@@ -1,6 +1,6 @@
 # Mis apps para Mac
 
-Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Command Line Tools). Casi todas viven en la barra de menú; Historietas, Compresor, Lazo y Grabador tienen ventana y viven en el Dock.
+Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Command Line Tools). Casi todas viven en la barra de menú; Historietas, Compresor, Lazo, Grabador y Revela tienen ventana y viven en el Dock.
 
 | App | Qué hace | macOS |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 | [Compresor](Compresor/) | Abrir, extraer y crear comprimidos (ZIP con AES-256, 7z, RAR 4/5, TAR…), con Servicios del Finder, al estilo de WinZip | 14+ |
 | [Lazo](Lazo/) | Colocar ventanas con la cuadrícula de cada monitor (⌥⇧L sobre la ventana), zonas con atajo y arrastre con ⌃⌥, al estilo de Lasso | 14+ |
 | [Grabador](Grabador/) | Grabar imágenes de sistemas (.img, .iso, .zip, .xz…) en USB y tarjetas SD con verificación, al estilo de balenaEtcher | 14+ |
+| [Revela](Revela/) | Editor de fotos (también RAW) con ajustes, looks, LUT .cube y la IA de macOS: desenfocar fondo, luz del sujeto, enderezar horizonte. Inspirado en Luminar | 14+ |
 | [Historietas](Historietas/) | Lector de cómics CBZ, CBR, CB7 y CBT, con doble página, lectura de manga y la página por la que ibas | 14+ |
 
 Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md).

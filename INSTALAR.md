@@ -13,6 +13,7 @@ Hay nueve apps. Instala las que quieras:
 | **Compresor** | Abrir, extraer y crear archivos comprimidos (ZIP, 7z, RAR, TAR…) | macOS 14 o posterior |
 | **Lazo** | Colocar ventanas en la cuadrícula de cada monitor con ⌥⇧L, como Lasso | macOS 14 o posterior |
 | **Grabador** | Grabar imágenes de sistemas en USB y tarjetas SD para que arranquen, como balenaEtcher | macOS 14 o posterior |
+| **Revela** | Editar fotos (también RAW) con looks y la IA de macOS, como Luminar | macOS 14 o posterior |
 | **Historietas** | Leer cómics y manga en formato CBZ, CBR, CB7 y CBT | macOS 14 o posterior |
 
 Funcionan en cualquier Mac con chip Apple (M1, M2, M3, M4, M5…).
@@ -35,7 +36,7 @@ Solo hay que hacerlo una vez por app.
 
 ## 3. Dar los permisos
 
-Captura, Portapapeles, Puntos, Monitor, Ventanas y Volumen viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas, Compresor, Lazo y Grabador sí aparecen en el Dock, como cualquier app con ventanas.
+Captura, Portapapeles, Puntos, Monitor, Ventanas y Volumen viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas, Compresor, Lazo, Grabador y Revela sí aparecen en el Dock, como cualquier app con ventanas.
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
@@ -44,7 +45,7 @@ Captura, Portapapeles, Puntos, Monitor, Ventanas y Volumen viven en la **barra d
 - **Lazo:** al abrirla pedirá el permiso de **Accesibilidad** (para mover las ventanas de otras apps). Actívalo en Ajustes y Lazo se pondrá en marcha sola.
 - **Compresor:** sus opciones aparecen en el clic derecho del Finder (*Comprimir con Compresor*, *Extraer aquí con Compresor*). Si no salen, búscalas en el submenú *Servicios*.
 - **Grabador:** al pulsar *¡Grabar!* macOS pide tu contraseña de administrador con su propio cuadro (hace falta para escribir en el USB o la tarjeta SD). Solo muestra unidades externas, nunca el disco del Mac.
-- **Puntos**, **Monitor** e **Historietas:** no necesitan permisos.
+- **Puntos**, **Monitor**, **Historietas** y **Revela:** no necesitan permisos.
 
 En el menú de las apps de la barra de menú puedes activar **Abrir al iniciar sesión** para que arranque sola.
 
