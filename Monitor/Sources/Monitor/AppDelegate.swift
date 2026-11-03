@@ -88,6 +88,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        BarraLink.connect(statusItem) { [weak self] in
+            if let menu = self?.statusItem.menu { BarraLink.popUp(menu) }
+        }
         updateStatusItem()
 
         // El nombre de la red Wi-Fi requiere permiso de ubicación.

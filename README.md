@@ -14,6 +14,7 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 | [Lazo](Lazo/) | Colocar ventanas con la cuadrícula de cada monitor (⌥⇧L sobre la ventana), zonas con atajo y arrastre con ⌃⌥, al estilo de Lasso | 14+ |
 | [Grabador](Grabador/) | Grabar imágenes de sistemas (.img, .iso, .zip, .xz…) en USB y tarjetas SD con verificación, al estilo de balenaEtcher | 14+ |
 | [Revela](Revela/) | Editor de fotos (también RAW) con ajustes, looks, LUT .cube y la IA de macOS: desenfocar fondo, luz del sujeto, enderezar horizonte. Inspirado en Luminar | 14+ |
+| [Barra](Barra/) | Junta en un solo icono las demás apps: las desmarcadas esconden su icono y siguen funcionando | 14+ |
 | [Historietas](Historietas/) | Lector de cómics CBZ, CBR, CB7 y CBT, con doble página, lectura de manga y la página por la que ibas | 14+ |
 
 Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md).
@@ -39,3 +40,7 @@ Para generar los `.zip` y las instrucciones en `dist/`:
 ```
 
 Los iconos se generan con [iconos/crear-icono.swift](iconos/crear-icono.swift).
+
+## Otras herramientas
+
+- [FormsMCP](FormsMCP/): servidor MCP para que Claude Desktop lea los formularios, menús y librerías de Oracle Forms (convertidos con `frmf2xml`), junto al SQLcl MCP.
