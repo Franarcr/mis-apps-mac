@@ -19,6 +19,23 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 
 Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md).
 
+## Vital (iPhone)
+
+[Vital](Vital/) es una app de iPhone (iOS 18+) al estilo de Bevel, con los datos del Apple Watch y de la báscula que llegan a Salud. Todo se calcula en el teléfono, sin internet.
+
+- **Salud:** recuperación diaria frente a tu propia base (VFC, pulso en reposo, sueño, temperatura, respiración, SpO₂), estrés y energía del día, sueño con regularidad y deuda, avisos del reloj y consejo del día. Todo en semáforo, con historial de 30 días.
+- **Entreno:** esfuerzo del día frente al objetivo según la recuperación, carga semanal, VO₂ máx., recuperación cardiaca y entrenamientos con zonas de pulso.
+- **Rutinas:** 876 ejercicios en español ([free-exercise-db](https://github.com/yuhonas/free-exercise-db), dominio público) filtrables por músculo y equipo, ejercicios propios, pirámide 12-10-8-6 y cargas que se estiman por tu perfil y se ajustan con lo que anotas.
+- **Cuerpo:** peso, grasa, masa magra e IMC de la báscula (Fitdays) vía Salud, y el resto del informe (grasa visceral, agua, músculo, hueso, metabolismo basal, edad corporal…) leído de una captura.
+
+Necesita Xcode. Se compila e instala en un iPhone conectado con:
+
+```bash
+cd Vital && xcodebuild -project Vital.xcodeproj -scheme Vital -destination 'id=<UDID>' -allowProvisioningUpdates build
+```
+
+En `Vital.xcodeproj` cambia `DEVELOPMENT_TEAM` por tu equipo.
+
 ## Compilar
 
 Una sola vez, crea el certificado de firma local para que macOS conserve los permisos al recompilar:
