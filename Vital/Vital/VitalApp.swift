@@ -7,7 +7,7 @@ struct VitalApp: App {
     @StateObject private var training = TrainingModel()
     @StateObject private var bodyData = BodyModel()
     @StateObject private var stress = StressModel()
-    private let container = try! ModelContainer(for: Routine.self, RoutineItem.self, SetLog.self, CustomExercise.self, ScaleReading.self)
+    private let container = try! ModelContainer(for: Routine.self, RoutineItem.self, SetLog.self, CustomExercise.self, ScaleReading.self, FoodEntry.self, SavedFood.self)
 
     var body: some Scene {
         WindowGroup {
@@ -20,6 +20,9 @@ struct VitalApp: App {
                 }
                 Tab("Rutinas", systemImage: "dumbbell.fill") {
                     RoutinesView(health: model)
+                }
+                Tab("Comida", systemImage: "fork.knife") {
+                    NutritionView(bodyData: bodyData)
                 }
             }
             .task {

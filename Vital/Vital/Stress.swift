@@ -237,15 +237,14 @@ struct StressEnergyCard: View {
                 .chartYScale(domain: 0...100)
                 .chartXAxis { AxisMarks(values: .stride(by: .hour, count: 3)) { _ in AxisValueLabel(format: .dateTime.hour()) } }
                 .frame(height: 130)
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     legend(.yellow, "Energía")
-                    legend(.green, "Calma")
-                    legend(.orange, "Estrés medio")
-                    legend(.red, "Alto")
+                    legend(.orange, "Estrés")
                     legend(.cyan.opacity(0.5), "Entreno")
-                    legend(.white.opacity(0.3), "En movimiento")
+                    legend(.white.opacity(0.3), "Movimiento")
                 }
                 .font(.caption2)
+                .lineLimit(1)
                 let m = result.minutesByLevel
                 Text("Hoy: \(minutes(TimeInterval(m.low * 60))) en calma · \(minutes(TimeInterval(m.medium * 60))) estrés medio · \(minutes(TimeInterval(m.high * 60))) alto")
                     .font(.caption).foregroundStyle(.secondary)

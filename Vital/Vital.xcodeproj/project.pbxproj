@@ -43,6 +43,7 @@
 			GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 			INFOPLIST_KEY_CFBundleDisplayName = Vital;
 			INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tus datos del reloj (sueño, pulso, VFC, entrenamientos) y tu peso para calcular recuperación, carga y pesos de tus rutinas. Nada sale de tu iPhone.";
+			INFOPLIST_KEY_NSCameraUsageDescription = "Vital usa la cámara para escanear códigos de barras y fotografiar etiquetas nutricionales.";
 			INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 			PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital; PRODUCT_NAME = "$(TARGET_NAME)";
 			TARGETED_DEVICE_FAMILY = 1; MARKETING_VERSION = 0.1; CURRENT_PROJECT_VERSION = 1;

@@ -21,12 +21,13 @@ Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md
 
 ## Vital (iPhone)
 
-[Vital](Vital/) es una app de iPhone (iOS 18+) al estilo de Bevel, con los datos del Apple Watch y de la báscula que llegan a Salud. Todo se calcula en el teléfono, sin internet.
+[Vital](Vital/) es una app de iPhone (iOS 18+) al estilo de Bevel, con los datos del Apple Watch y de la báscula que llegan a Salud. Todo se calcula en el teléfono; solo la búsqueda por código de barras usa internet.
 
 - **Salud:** recuperación diaria frente a tu propia base (VFC, pulso en reposo, sueño, temperatura, respiración, SpO₂), estrés y energía del día, sueño con regularidad y deuda, avisos del reloj y consejo del día. Todo en semáforo, con historial de 30 días.
 - **Entreno:** esfuerzo del día frente al objetivo según la recuperación, carga semanal, VO₂ máx., recuperación cardiaca y entrenamientos con zonas de pulso.
 - **Rutinas:** 876 ejercicios en español ([free-exercise-db](https://github.com/yuhonas/free-exercise-db), dominio público) filtrables por músculo y equipo, ejercicios propios, pirámide 12-10-8-6 y cargas que se estiman por tu perfil y se ajustan con lo que anotas.
 - **Cuerpo:** peso, grasa, masa magra e IMC de la báscula (Fitdays) vía Salud, y el resto del informe (grasa visceral, agua, músculo, hueso, metabolismo basal, edad corporal…) leído de una captura.
+- **Comida:** calorías y macros del día según tu metabolismo basal, la energía activa del reloj y tu objetivo. Comida tica con valores aproximados, código de barras (Open Food Facts, solo se envía el código), foto de la etiqueta leída en el teléfono y comidas a mano. Cada producto se califica en semáforo por azúcares, sodio, grasas y aditivos.
 
 Necesita Xcode. Se compila e instala en un iPhone conectado con:
 
