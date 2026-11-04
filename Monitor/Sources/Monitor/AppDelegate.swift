@@ -101,6 +101,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monitor.start()
     }
 
+    /// Abrir la app cuando ya está abierta muestra su menú: si macOS o Barra escondieron el icono,
+    /// es la única forma de llegar a él.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if let menu = statusItem.menu { BarraLink.popUp(menu) }
+        return false
+    }
+
     /// En el escritorio (debajo de las ventanas, como un widget) o siempre encima.
     private func applyLevel() {
         let level: NSWindow.Level = Preferences.alwaysOnTop
