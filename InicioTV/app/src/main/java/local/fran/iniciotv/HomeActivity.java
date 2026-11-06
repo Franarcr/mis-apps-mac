@@ -70,9 +70,12 @@ public class HomeActivity extends Activity {
             "com.mubi",                                 // MUBI
             "com.iqiyi.i18n.tv",                        // iQIYI
             "com.tcl.browser",                          // BrowseHere
-            "com.Tv.Receiver.phonetotv.casting.screenmirroring.Recievertv")); // Screen mirroring
+            "com.Tv.Receiver.phonetotv.casting.screenmirroring.Recievertv", // Screen mirroring
+            "tv.maxplayer.android"));
 
-    private static final String LIVE_TV = "com.mediatek.wwtv.tvcenter";
+    // Entradas del TV (ver `adb shell dumpsys tv_input`): sintonizador de antena y HDMI 2, donde entra el cable.
+    private static final String ANTENNA = "com.mediatek.tvinput/.tuner.TunerInputService/HW0";
+    private static final String CABLE = "com.mediatek.tvinput/.hdmi.HDMIInputService/HW5";
 
     private LinearLayout rows;
     /** Fondo de pantalla completa: la imagen de la app seleccionada, muy difuminada (como en Apple TV). */
@@ -121,7 +124,7 @@ public class HomeActivity extends Activity {
         rows.setOrientation(LinearLayout.VERTICAL);
         rows.setClipChildren(false);
         FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        rlp.bottomMargin = dp(28);
+        rlp.bottomMargin = dp(80);
         root.addView(rows, rlp);
 
         setContentView(root);
@@ -187,24 +190,22 @@ public class HomeActivity extends Activity {
         others.sort((x, y) -> x.name.toLowerCase(Locale.ROOT).compareTo(y.name.toLowerCase(Locale.ROOT)));
 
         rows.removeAllViews();
-        // Cuadrícula fija de 5 columnas: todas las apps a la vista, sin desplazarse de lado.
+        // Cuadrícula fija de 5 columnas: las apps y, al final, los accesos del TV con el mismo formato.
+        List<View> cells = new ArrayList<>();
         List<App> all = new ArrayList<>(favorites);
         all.addAll(others);
-        LinearLayout row = null;
-        for (int i = 0; i < all.size(); i++) {
-            if (i % COLUMNS == 0) row = newRow(dp(4));
-            App a = all.get(i);
-            row.addView(tile(a.name, a.banner, a.icon, a.launch));
-        }
-
-        // Abajo, en botones pequeños: TV en vivo, selector de entradas y configuración.
-        LinearLayout tv = newRow(dp(18));
-        Intent live = pm.getLeanbackLaunchIntentForPackage(LIVE_TV);
-        if (live != null) tv.addView(pill("TV en vivo", R.drawable.ic_tv, live.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        for (App a : all) cells.add(tile(a.name, a.banner, a.icon, a.launch));
+        cells.add(tile("TV en vivo", null, getDrawable(R.drawable.ic_tv), input(ANTENNA)));   // antena
+        cells.add(tile("Cable", null, getDrawable(R.drawable.ic_cable), input(CABLE)));       // HDMI 2
         Intent inputs = new Intent("com.android.tv.action.VIEW_INPUTS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (inputs.resolveActivity(pm) != null) tv.addView(pill("Entradas", R.drawable.ic_input, inputs));
+        if (inputs.resolveActivity(pm) != null) cells.add(tile("Entradas", null, getDrawable(R.drawable.ic_input), inputs));
         Intent settings = new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        tv.addView(pill("Configuración", R.drawable.ic_gear, settings));
+        cells.add(tile("Configuración", null, getDrawable(R.drawable.ic_gear), settings));
+        LinearLayout row = null;
+        for (int i = 0; i < cells.size(); i++) {
+            if (i % COLUMNS == 0) row = newRow(dp(4));
+            row.addView(cells.get(i));
+        }
         focusFirst();
     }
 
@@ -220,43 +221,11 @@ public class HomeActivity extends Activity {
         return row;
     }
 
-    /** Botón pequeño con ícono y texto, para la fila de TV. */
-    private View pill(String name, int iconRes, Intent launch) {
-        LinearLayout p = new LinearLayout(this);
-        p.setOrientation(LinearLayout.HORIZONTAL);
-        p.setGravity(Gravity.CENTER);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x33FFFFFF);
-        bg.setCornerRadius(dp(20));
-        p.setBackground(bg);
-        ImageView img = new ImageView(this);
-        Drawable icon = getDrawable(iconRes).mutate();
-        img.setImageDrawable(icon);
-        p.addView(img, new LinearLayout.LayoutParams(dp(18), dp(18)));
-        TextView label = new TextView(this);
-        label.setText(name);
-        label.setTextColor(Color.WHITE);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        label.setPadding(dp(8), 0, 0, 0);
-        p.addView(label);
-        p.setFocusable(true);
-        p.setOnClickListener(v -> {
-            try { startActivity(launch); } catch (Exception ignored) { }
-        });
-        p.setOnFocusChangeListener((v, has) -> {
-            bg.setColor(has ? 0xFFFFFFFF : 0x33FFFFFF);
-            label.setTextColor(has ? 0xFF111111 : Color.WHITE);
-            icon.setTint(has ? 0xFF111111 : Color.WHITE);
-            v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(150).start();
-            if (has) showBackdrop(darkBackdrop);
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(150), dp(38));
-        lp.setMargins(0, 0, dp(20), 0);
-        p.setLayoutParams(lp);
-        return p;
+    /** Abre directamente una entrada del TV (sintonizador o HDMI) por su id. */
+    private static Intent input(String inputId) {
+        return new Intent(Intent.ACTION_VIEW, android.media.tv.TvContract.buildChannelUriForPassthroughInput(inputId))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     }
-
-    private final Drawable darkBackdrop = new ColorDrawable(0xFF0E141B);
 
     /** Al volver al inicio, la selección empieza en la primera app. */
     private void focusFirst() {
@@ -310,7 +279,7 @@ public class HomeActivity extends Activity {
         });
         // Nombre debajo, solo en la app seleccionada.
         TextView name_ = new TextView(this);
-        name_.setText(name);
+        if (banner != null) name_.setText(name);
         name_.setTextColor(Color.WHITE);
         name_.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         name_.setGravity(Gravity.CENTER);
@@ -319,6 +288,7 @@ public class HomeActivity extends Activity {
         Drawable blurred = blurred(banner);
         t.setOnFocusChangeListener((v, has) -> {
             float s = has ? 1.15f : 1f;
+            if (banner == null) bg.setColor(has ? 0xFF4A5868 : 0xFF1E2630);
             v.animate().scaleX(s).scaleY(s).translationZ(has ? dp(20) : 0).setDuration(180).start();
             name_.animate().alpha(has ? 1f : 0f).translationY(has ? dp(8) : 0).setDuration(180).start();
             if (has) showBackdrop(blurred);

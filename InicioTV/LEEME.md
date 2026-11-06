@@ -16,7 +16,8 @@ y botones de TV en vivo, Entradas y Configuración abajo.
 3. Desde el Mac: `adb connect IP:5555` y aceptar «Permitir siempre» en el televisor.
 4. Revisar en ese televisor qué paquetes cambian (TV en vivo y apps que se quieran ocultar):
    `adb shell cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER`
-   y ajustar `HIDDEN`, `FAVORITES` y `LIVE_TV` en HomeActivity.java si hace falta.
+   y ajustar `HIDDEN`, `FAVORITES`, `ANTENNA` y `CABLE` en HomeActivity.java si hace falta
+   (los ids de las entradas salen con `adb shell dumpsys tv_input`).
 5. Compilar e instalar (`./gradlew assembleDebug` y `adb install -r ...`).
 6. Hacerlo la pantalla de inicio:
        adb shell pm disable-user --user 0 com.google.android.apps.tv.launcherx
@@ -29,3 +30,9 @@ y botones de TV en vivo, Entradas y Configuración abajo.
     adb connect 192.168.5.235:5555
     adb shell pm enable com.google.android.tungsten.setupwraith
     adb shell pm enable com.google.android.apps.tv.launcherx
+
+## Al encender, abrir el inicio
+Configuración → Sistema → Encendido y energía → «Comportamiento cuando se enciende la TV».
+Ese panel lo dibuja el inicio de Google: con él desactivado sale vacío. Para cambiarlo,
+`pm enable com.google.android.apps.tv.launcherx`, elegir «Pantalla principal», volver a
+desactivarlo y repetir `cmd package set-home-activity local.fran.iniciotv/.HomeActivity`.
