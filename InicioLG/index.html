@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inicio</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0E141B; font-family: "LG Smart UI", "Museo Sans", sans-serif; color: #fff; }
+  /* Fondo: el banner seleccionado, muy difuminado. Dos capas para fundir de una a otra. */
+  .bd { position: absolute; inset: -120px; background-size: cover; background-position: center; filter: blur(70px) saturate(1.3); opacity: 0; transition: opacity .5s; }
+  .bd.on { opacity: 1; }
+  #shade { position: absolute; inset: 0; background: linear-gradient(#00000055, #00000099 45%, #050709f0); }
+  #clock { position: absolute; top: 48px; right: 112px; text-align: right; }
+  #time { font-size: 62px; font-weight: 500; line-height: 1.1; }
+  #date { font-size: 32px; color: #ffffff99; }
+  #grid { position: absolute; left: 112px; top: 268px; display: grid; grid-template-columns: repeat(5, 300px); grid-auto-rows: 168px; column-gap: 40px; row-gap: 52px; }
+  .cell { position: relative; }
+  .tile { width: 300px; height: 168px; border-radius: 24px; overflow: hidden; background: #1E2630 center / cover no-repeat;
+          transition: transform .18s ease-out, box-shadow .18s ease-out, background-color .18s; }
+  .cell.focus .tile { transform: scale(1.15); box-shadow: 0 24px 50px #000a; }
+  .name { position: absolute; left: 0; right: 0; top: 168px; text-align: center; font-size: 26px; opacity: 0; transform: translateY(0); transition: opacity .18s, transform .18s; }
+  .cell.focus .name { opacity: 1; transform: translateY(20px); }
+  /* Accesos del TV: ícono y nombre dentro del cuadro. */
+  .sys .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .sys .tile svg { width: 68px; height: 68px; fill: #fff; }
+  .sys .tile span { font-size: 24px; margin-top: 12px; }
+  .sys.focus .tile { background-color: #4A5868; }
+</style>
+</head>
+<body>
+<div class="bd" id="bd0"></div><div class="bd" id="bd1"></div>
+<div id="shade"></div>
+<div id="clock"><div id="time"></div><div id="date"></div></div>
+<div id="grid"></div>
+<script>
+// Apps del TV, en orden (ids de webOS; imágenes en img/).
+var APPS = [
+  ['netflix', 'Netflix'],
+  ['youtube.leanback.v4', 'YouTube'],
+  ['com.wbd.stream', 'HBO Max'],
+  ['amazon', 'Prime Video'],
+  ['com.apple.appletv', 'Apple TV'],
+  ['com.crunchyroll.webapp', 'Crunchyroll'],
+  ['com.pplus.webapp.prod-intl', 'Paramount+'],
+  ['maxplayer.tv', 'MaxPlayer'],
+  ['com.apple.applemusic', 'Apple Music']
+];
+// Accesos del TV. Si un id no existe en este modelo se prueba el siguiente.
+var ICON = {
+  tv: 'M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3c-1.1 0-2 .89-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm0 14H3V8h18v12zM9 10v8l7-4z',
+  cable: 'M18 7V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v3H5v6l3 6v3h8v-3l3-6V7h-1zM8 4h8v3h-2V5h-1v2h-2V5h-1v2H8V4z',
+  input: 'M21 3.01H3c-1.1 0-2 .9-2 2V9h2V4.99h18v14.03H3V15H1v4.01c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98v-14c0-1.11-.9-2-2-2zM11 16l4-4-4-4v3H1v2h10v3z',
+  gear: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'
+};
+var SYSTEM = [
+  [['com.webos.app.livetv'], 'TV en vivo', 'tv'],   // sintonizador: aquí entra el cable por coaxial
+  [['com.webos.app.homeconnect'], 'Entradas', 'input'],
+  [['com.palm.app.settings'], 'Configuración', 'gear']
+];
+var COLUMNS = 5;
+
+function launch(ids, i) {
+  i = i || 0;
+  if (i >= ids.length) return;
+  try {
+    var b = new PalmServiceBridge();
+    b.onservicecallback = function (r) {
+      try { if (!JSON.parse(r).returnValue) launch(ids, i + 1); } catch (e) {}
+    };
+    b.call('luna://com.webos.applicationManager/launch', JSON.stringify({ id: ids[i] }));
+  } catch (e) {}
+}
+
+var cells = [], focused = 0, grid = document.getElementById('grid');
+function add(cell, ids) {
+  cell.className += ' cell';
+  cell.onclick = function () { launch(ids); };
+  cell.onmouseenter = (function (n) { return function () { focus(n); }; })(cells.length);
+  grid.appendChild(cell);
+  cells.push(cell);
+}
+APPS.forEach(function (a) {
+  var c = document.createElement('div');
+  c.innerHTML = '<div class="tile"></div><div class="name"></div>';
+  c.firstChild.style.backgroundImage = 'url("img/' + a[0] + '.png")';
+  c.lastChild.textContent = a[1];
+  c.dataset.img = 'img/' + a[0] + '.png';
+  add(c, [a[0]]);
+});
+// Los accesos del TV empiezan en una fila nueva.
+while (cells.length % COLUMNS) { grid.appendChild(document.createElement('div')); cells.push(null); }
+SYSTEM.forEach(function (s) {
+  var c = document.createElement('div');
+  c.className = 'sys';
+  c.innerHTML = '<div class="tile"><svg viewBox="0 0 24 24"><path d="' + ICON[s[2]] + '"/></svg><span></span></div>';
+  c.querySelector('span').textContent = s[1];
+  add(c, s[0]);
+});
+
+var bd = [document.getElementById('bd0'), document.getElementById('bd1')], bdOn = 0;
+function backdrop(img) {
+  var next = bd[1 - bdOn];
+  next.style.backgroundImage = img ? 'url("' + img + '")' : 'none';
+  next.style.backgroundColor = img ? '' : '#0E141B';
+  next.className = 'bd on';
+  bd[bdOn].className = 'bd';
+  bdOn = 1 - bdOn;
+}
+function focus(n) {
+  if (n < 0 || n >= cells.length || !cells[n]) return false;
+  if (cells[focused]) cells[focused].classList.remove('focus');
+  focused = n;
+  cells[n].classList.add('focus');
+  backdrop(cells[n].dataset.img);
+  return true;
+}
+function move(dx, dy) {
+  var n = focused + dx + dy * COLUMNS;
+  if (dx && Math.floor(n / COLUMNS) !== Math.floor(focused / COLUMNS)) return;
+  if (dy) {
+    // Si la celda de abajo está vacía, se va a la última de esa fila.
+    while (n >= 0 && n < cells.length && !cells[n] && n % COLUMNS > 0) n--;
+  }
+  focus(n);
+}
+document.addEventListener('keydown', function (e) {
+  switch (e.keyCode) {
+    case 37: move(-1, 0); break;
+    case 39: move(1, 0); break;
+    case 38: move(0, -1); break;
+    case 40: move(0, 1); break;
+    case 13: if (cells[focused]) cells[focused].click(); break;
+    case 461: break;   // «atrás»: esta pantalla no se cierra
+    default: return;
+  }
+  e.preventDefault();
+});
+// Al volver a abrirla desde la barra de LG, la selección empieza en la primera app.
+document.addEventListener('webOSRelaunch', function () { focus(0); });
+
+var DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+var MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+function tick() {
+  var d = new Date();
+  document.getElementById('time').textContent = d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2);
+  document.getElementById('date').textContent = DAYS[d.getDay()] + ' ' + d.getDate() + ' de ' + MONTHS[d.getMonth()];
+}
+tick();
+setInterval(tick, 5000);
+focus(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "id": "local.fran.inicio",
+  "version": "1.0.4",
+  "vendor": "Fran",
+  "type": "web",
+  "main": "index.html",
+  "title": "Inicio",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0E141B",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}
