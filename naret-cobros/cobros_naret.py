@@ -140,36 +140,25 @@ def leer_historial():
     return [json.loads(l) for l in open(HISTORIAL, encoding="utf-8") if l.strip()]
 
 
+RECORD = os.path.join(AQUI, "recordatorios")   # usa EventKit: no abre la app Recordatorios
+
+
 def estados_recordatorios():
     """FT -> fecha (aaaa-mm-dd) en que se marcó hecho, o "" si sigue pendiente."""
-    s = f'''tell application "Reminders"
-  set out to ""
-  repeat with r in (reminders of list "{LISTA_REC}" whose name starts with "Pagar Naret")
-    set b to body of r
-    if b is missing value then set b to ""
-    set cd to ""
-    if completed of r then
-      set x to completion date of r
-      if x is not missing value then set cd to ((year of x) as string) & "-" & ((month of x as integer) as string) & "-" & ((day of x) as string)
-      if cd is "" then set cd to "?"
-    end if
-    set out to out & cd & tab & (paragraph 1 of (do shell script "echo " & quoted form of b & " | grep -o 'FT[0-9]*' | head -1")) & linefeed
-  end repeat
-  return out
-end tell'''
+    r = subprocess.run([RECORD, "listar", LISTA_REC, "Pagar Naret"], capture_output=True,
+                       text=True, timeout=120)
+    if r.returncode:
+        raise RuntimeError("recordatorios: " + r.stderr.strip())
     res = {}
-    for linea in osa(s).splitlines():
-        if "\t" not in linea:
+    for linea in r.stdout.splitlines():
+        p = linea.split("\t")
+        if len(p) < 3 or not p[2]:
             continue
-        cd, ft = linea.split("\t", 1)
-        if not ft:
-            continue
-        if cd and cd != "?":
-            y, m, d = map(int, cd.split("-"))
-            cd = dt.date(y, m, d).isoformat()
+        hecho, cd, ft = p[0] == "1", p[1], p[2]
+        valor = (cd or "?") if hecho else ""
         # si hay varios recordatorios del mismo FT, basta con que uno esté hecho
-        if cd or ft not in res:
-            res[ft] = cd
+        if valor or ft not in res:
+            res[ft] = valor
     return res
 
 
@@ -219,26 +208,12 @@ def actualizar_estado(forzar=False):
 
 
 def crear_recordatorio(c):
-    d = dt.date.fromisoformat(c["limite"])
     nombre = (f"Pagar Naret: {c['concepto']} {c['periodo']} {colones(c['total'])}, "
               f"vence {fecha_corta(c['limite'])}")
-    s = f'''on run argv
-set d to current date
-set day of d to 1
-set year of d to {d.year}
-set month of d to {d.month}
-set day of d to {d.day}
-set time of d to 9 * hours
-tell application "Reminders"
-  set l to list "{LISTA_REC}"
-  if (count of (reminders of l whose name is (item 1 of argv) and completed is false)) is 0 then
-    -- un solo recordatorio: fecha = día que vence; aviso = en 1 minuto
-    set ya to (current date) + 60
-    make new reminder at end of l with properties {{name:(item 1 of argv), body:(item 2 of argv), due date:d, remind me date:ya}}
-  end if
-end tell
-end run'''
-    osa(s, nombre, detalle(c))
+    r = subprocess.run([RECORD, "crear", LISTA_REC, nombre, detalle(c), c["limite"]],
+                       capture_output=True, text=True, timeout=120)
+    if r.returncode:
+        raise RuntimeError("recordatorios: " + r.stderr.strip())
 
 
 def main():
