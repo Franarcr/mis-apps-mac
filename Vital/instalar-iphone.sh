@@ -10,8 +10,8 @@
 # Se pueden combinar: ./instalar-iphone.sh --demo --ayuno-demo
 # Los argumentos solo valen para esa apertura; si luego abres Vital desde el iPhone, usa tus datos.
 #
-# Necesita Xcode (no basta con las Command Line Tools) y el iPhone conectado por cable,
-# desbloqueado, con «Confiar en este ordenador» y el Modo desarrollador activado.
+# Necesita Xcode (no basta con las Command Line Tools) y el iPhone emparejado con este Mac, por cable
+# o por Wi-Fi (misma red, como cuando Xcode instala sin cable), desbloqueado y con el Modo desarrollador activado.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -55,7 +55,8 @@ for d in devices:
 EOF
 )"
 if [ -z "$UDID" ]; then
-  echo "No encuentro un iPhone emparejado. Conéctalo por cable, desbloquéalo, acepta «Confiar»"
+  echo "No encuentro un iPhone emparejado. Desbloquéalo y ponlo en la misma Wi-Fi que este Mac"
+  echo "(o conéctalo por cable y acepta «Confiar»)"
   echo "y activa Ajustes › Privacidad y seguridad › Modo desarrollador. Luego vuelve a intentarlo."
   exit 1
 fi

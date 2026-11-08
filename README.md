@@ -31,7 +31,7 @@ Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md
 
 - **Ayuno:** temporizador con fases estimadas y planes 12:12 a 18:6 que se cierra solo al registrar comida, con racha, regularidad, historial y avisos. Lo cruza con tu sueño y VFC, la recuperación y el entreno, la proteína de la ventana, el peso y la glucosa si tienes sensor. Fuera de la app: Actividad en vivo en la pantalla bloqueada y la Dynamic Island, widgets de inicio y de pantalla bloqueada con botón para empezar o terminar, y Siri («Empezar ayuno en Vital», «Cuánto llevo de ayuno en Vital»).
 
-Necesita Xcode. Con el iPhone conectado por cable (desbloqueado y con el Modo desarrollador activado), este script la compila, la instala y la abre:
+Necesita Xcode. Con el iPhone emparejado con el Mac, por cable o por Wi-Fi (desbloqueado y con el Modo desarrollador activado), este script la compila, la instala y la abre:
 
 ```bash
 cd Vital && ./instalar-iphone.sh
