@@ -13,7 +13,9 @@ enum VitalStore {
 /// Lleva el estado del ayuno a los widgets y a la Actividad en vivo después de cada cambio.
 @MainActor
 enum FastingSync {
-    static func refresh(in context: ModelContext = VitalStore.container.mainContext) {
+    static func refresh(in given: ModelContext? = nil) {
+        // El contexto por defecto se toma aquí dentro: como valor por defecto del parámetro no se puede.
+        let context = given ?? VitalStore.container.mainContext
         let defaults = UserDefaults.standard
         let enabled = defaults.bool(forKey: "ayunoActivo")
         let goal = defaults.object(forKey: "ayunoMeta") as? Double ?? 16
