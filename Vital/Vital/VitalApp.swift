@@ -48,7 +48,9 @@ struct VitalApp: App {
     /// Ayudas para probar desde el Mac (se pasan al abrir la app con devicectl o simctl):
     /// - `-leer captura.jpg`: imprime lo que el lector saca de una captura (ruta o archivo en Documentos).
     /// - `-borrar-lecturas-guardadas-el 2026-11-04`: borra las lecturas de la báscula guardadas ese día.
-    /// - `-ayuno-demo`: activa el control de ayuno y carga una semana de ayunos de ejemplo (si no hay ninguno).
+    /// - `-ayuno-demo`: activa el control de ayuno, carga una semana de ayunos de ejemplo (si no hay ninguno)
+    ///   y muestra una curva de glucosa de ejemplo mientras la app siga abierta con este argumento.
+    /// - `-ayuno-demo-borrar`: borra los ayunos de ejemplo.
     @MainActor private func maintenance() async {
         let args = ProcessInfo.processInfo.arguments
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -76,13 +78,24 @@ struct VitalApp: App {
                     let start = cal.date(byAdding: .day, value: -daysAgo, to: today)!.addingTimeInterval(startHour * 3600)
                     let s = FastingSession(start: start, goalHours: 16)
                     s.end = start.addingTimeInterval(hours * 3600)
-                    s.endedBy = "comida"
+                    s.endedBy = "ejemplo"
                     context.insert(s)
                 }
-                context.insert(FastingSession(start: .now.addingTimeInterval(-13.4 * 3600), goalHours: 16))
+                let current = FastingSession(start: .now.addingTimeInterval(-13.4 * 3600), goalHours: 16)
+                current.endedBy = "ejemplo"
+                context.insert(current)
                 try? context.save()
             }
             UserDefaults.standard.set(true, forKey: "ayunoActivo")
+        }
+        if args.contains("-ayuno-demo-borrar") {
+            let context = container.mainContext
+            let all = (try? context.fetch(FetchDescriptor<FastingSession>())) ?? []
+            let demo = all.filter { $0.endedBy == "ejemplo" }
+            demo.forEach { context.delete($0) }
+            try? context.save()
+            if demo.contains(where: \.isActive) { FastingNotifications.cancelAll() }
+            print("AYUNOS DE EJEMPLO BORRADOS", demo.count)
         }
     }
 }

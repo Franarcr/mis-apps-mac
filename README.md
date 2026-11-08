@@ -29,13 +29,15 @@ Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md
 - **Cuerpo:** peso, grasa, masa magra e IMC de la báscula (Fitdays) vía Salud, y el resto del informe (grasa visceral, agua, músculo, hueso, metabolismo basal, edad corporal…) leído de una captura.
 - **Comida:** calorías y macros del día según tu metabolismo basal, la energía activa del reloj y tu objetivo. Comida tica con valores aproximados, código de barras (Open Food Facts, solo se envía el código), foto de la etiqueta leída en el teléfono y comidas a mano. Cada producto se califica en semáforo por azúcares, sodio, grasas y aditivos.
 
-Necesita Xcode. Se compila e instala en un iPhone conectado con:
+- **Ayuno:** temporizador con fases estimadas y planes 12:12 a 18:6 que se cierra solo al registrar comida, con racha, regularidad, historial y avisos. Lo cruza con tu sueño y VFC, la recuperación y el entreno, la proteína de la ventana, el peso y la glucosa si tienes sensor.
+
+Necesita Xcode. Con el iPhone conectado por cable (desbloqueado y con el Modo desarrollador activado), este script la compila, la instala y la abre:
 
 ```bash
-cd Vital && xcodebuild -project Vital.xcodeproj -scheme Vital -destination 'id=<UDID>' -allowProvisioningUpdates build
+cd Vital && ./instalar-iphone.sh
 ```
 
-En `Vital.xcodeproj` cambia `DEVELOPMENT_TEAM` por tu equipo.
+Opciones: `--ayuno-demo` carga una semana de ayunos de ejemplo, `--borrar-demo` los borra y `--demo` usa datos inventados en vez de Salud. En `Vital.xcodeproj` cambia `DEVELOPMENT_TEAM` por tu equipo si no es el tuyo.
 
 ## Compilar
 

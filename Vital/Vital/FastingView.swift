@@ -336,7 +336,7 @@ struct FastingDetailView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(s.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()))
                                 Text(s.isActive ? "En curso · meta \(Int(s.goalHours)) h" :
-                                        "\(s.endedBy == "comida" ? "Cerrado al registrar comida" : "Terminado a mano") · meta \(Int(s.goalHours)) h")
+                                        "\(s.endedBy == "ejemplo" ? "Ejemplo" : s.endedBy == "comida" ? "Cerrado al registrar comida" : "Terminado a mano") · meta \(Int(s.goalHours)) h")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
