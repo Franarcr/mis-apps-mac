@@ -8,7 +8,7 @@ struct VitalApp: App {
     @StateObject private var bodyData = BodyModel()
     @StateObject private var stress = StressModel()
     @Environment(\.scenePhase) private var scenePhase
-    private let container = try! ModelContainer(for: Routine.self, RoutineItem.self, SetLog.self, CustomExercise.self, ScaleReading.self, FoodEntry.self, SavedFood.self, FastingSession.self)
+    private let container = VitalStore.container
 
     var body: some Scene {
         WindowGroup {
@@ -29,6 +29,8 @@ struct VitalApp: App {
             .task {
                 PhoneWatchLink.shared.activate(container: container)
                 await maintenance()
+                // Widgets y Actividad en vivo con el ayuno de ahora (Apple cierra la actividad a las 8 h).
+                FastingSync.refresh()
                 await AppExpiry.scheduleReminder()
                 await model.load()
                 await bodyData.load()
@@ -42,6 +44,7 @@ struct VitalApp: App {
             }
             .onChange(of: scenePhase) { _, phase in
                 // Al volver a Vital (p. ej. después de editar una rutina o de un entreno), el reloj recibe lo último.
+                if phase == .active { FastingSync.refresh() }
                 if phase == .active, model.state == .ready { PhoneWatchLink.shared.publish(health: model, stress: stress) }
             }
             // El ayuno cruza datos de todas las pestañas (sueño, entreno, peso).

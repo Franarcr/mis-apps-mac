@@ -37,57 +37,6 @@ enum FastingPlan: Double, CaseIterable, Identifiable {
     }
 }
 
-/// Lo que pasa en el cuerpo según las horas desde la última comida.
-/// Son rangos aproximados: dependen de lo que comiste, de cuánto te moviste y de cada persona.
-enum FastingPhase: Int, CaseIterable, Identifiable {
-    case digestion, glycogen, fatSwitch, ketosis, prolonged
-    var id: Int { rawValue }
-
-    var startHour: Double {
-        switch self {
-        case .digestion: 0
-        case .glycogen: 4
-        case .fatSwitch: 12
-        case .ketosis: 18
-        case .prolonged: 24
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .digestion: "Digestión"
-        case .glycogen: "Glucógeno bajando"
-        case .fatSwitch: "Cambio a grasa"
-        case .ketosis: "Cetosis leve"
-        case .prolonged: "Ayuno prolongado"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .digestion: "fork.knife"
-        case .glycogen: "arrow.down.circle"
-        case .fatSwitch: "flame"
-        case .ketosis: "bolt.heart"
-        case .prolonged: "exclamationmark.triangle"
-        }
-    }
-
-    var explanation: String {
-        switch self {
-        case .digestion: "Absorbes lo que comiste; la glucosa y la insulina están altas."
-        case .glycogen: "La insulina baja y el hígado va soltando glucosa de sus reservas (glucógeno)."
-        case .fatSwitch: "Con el glucógeno más bajo, usas más grasa y aparecen las primeras cetonas."
-        case .ketosis: "Las cetonas suben más. El hambre suele venir en olas y pasar."
-        case .prolonged: "Más de un día sin comer. Si lo haces seguido, coméntalo con tu médico."
-        }
-    }
-
-    static func at(hours: Double) -> FastingPhase {
-        allCases.last { hours >= $0.startHour } ?? .digestion
-    }
-}
-
 /// Resumen de los ayunos terminados.
 struct FastingStats {
     let finished: [FastingSession]   // del más reciente al más antiguo
@@ -151,6 +100,7 @@ struct FastingStats {
     }
 }
 
+@MainActor
 enum Fasting {
     /// Registrar comida de 50 kcal o más rompe el ayuno; un café negro o agua con limón no.
     static let breakingKcal = 50.0
@@ -170,6 +120,7 @@ enum Fasting {
         context.insert(session)
         try? context.save()
         FastingNotifications.scheduleGoal(for: session)
+        FastingSync.refresh(in: context)
     }
 
     static func finish(_ session: FastingSession, at date: Date = .now, by reason: String = "manual", in context: ModelContext) {
@@ -178,6 +129,7 @@ enum Fasting {
         try? context.save()
         FastingNotifications.cancelGoal()
         FastingNotifications.scheduleWindowClosing(fastEnded: session.end!, goalHours: session.goalHours)
+        FastingSync.refresh(in: context)
     }
 
     /// Se llama al registrar comida a la hora actual: si hay un ayuno en curso, termina en ese momento.

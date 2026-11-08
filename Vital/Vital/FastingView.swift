@@ -233,6 +233,7 @@ struct FastingSafetySheet: View {
                         caution = anyRisk
                         if caution { goal = min(goal, 14) }
                         enabled = true
+                        FastingSync.refresh()
                         dismiss()
                     }.bold()
                 }
@@ -250,6 +251,7 @@ struct FastingDetailView: View {
     @AppStorage("ayunoPrecaucion") private var caution = false
     @AppStorage("ayunoMeta") private var goal: Double = 16
     @AppStorage("ayunoAvisoVentana") private var windowAlert = true
+    @AppStorage("ayunoActividad") private var liveActivity = true
     @State private var editing: FastingSession?
 
     private var stats: FastingStats { FastingStats(sessions: sessions) }
@@ -279,6 +281,8 @@ struct FastingDetailView: View {
                         .font(.caption).foregroundStyle(.orange)
                 }
                 Toggle("Avisar 30 min antes de cerrar la ventana", isOn: $windowAlert)
+                Toggle("Mostrar en la pantalla bloqueada y la Dynamic Island", isOn: $liveActivity)
+                    .onChange(of: liveActivity) { FastingSync.refresh(in: context) }
             }
 
             if let active {
@@ -353,6 +357,7 @@ struct FastingDetailView: View {
                 Button("Desactivar control de ayuno", role: .destructive) {
                     FastingNotifications.cancelAll()
                     enabled = false
+                    FastingSync.refresh(in: context)
                 }
             } footer: {
                 Text("Tu historial se guarda; puedes volver a activarlo cuando quieras.")
@@ -370,6 +375,7 @@ struct FastingDetailView: View {
             try? context.save()
             FastingNotifications.scheduleGoal(for: active)
         }
+        FastingSync.refresh(in: context)
     }
 
     private func stat(_ title: String, _ value: String) -> some View {
@@ -404,6 +410,7 @@ private struct FastingEditSheet: View {
                         if session.isActive { FastingNotifications.cancelAll() }
                         context.delete(session)
                         try? context.save()
+                        FastingSync.refresh(in: context)
                         dismiss()
                     }
                 }
@@ -415,6 +422,7 @@ private struct FastingEditSheet: View {
                     Button("Listo") {
                         try? context.save()
                         if session.isActive { FastingNotifications.scheduleGoal(for: session) }
+                        FastingSync.refresh(in: context)
                         dismiss()
                     }.bold()
                 }

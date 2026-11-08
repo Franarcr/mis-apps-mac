@@ -29,7 +29,7 @@ Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md
 - **Cuerpo:** peso, grasa, masa magra e IMC de la báscula (Fitdays) vía Salud, y el resto del informe (grasa visceral, agua, músculo, hueso, metabolismo basal, edad corporal…) leído de una captura.
 - **Comida:** calorías y macros del día según tu metabolismo basal, la energía activa del reloj y tu objetivo. Comida tica con valores aproximados, código de barras (Open Food Facts, solo se envía el código), foto de la etiqueta leída en el teléfono y comidas a mano. Cada producto se califica en semáforo por azúcares, sodio, grasas y aditivos.
 
-- **Ayuno:** temporizador con fases estimadas y planes 12:12 a 18:6 que se cierra solo al registrar comida, con racha, regularidad, historial y avisos. Lo cruza con tu sueño y VFC, la recuperación y el entreno, la proteína de la ventana, el peso y la glucosa si tienes sensor.
+- **Ayuno:** temporizador con fases estimadas y planes 12:12 a 18:6 que se cierra solo al registrar comida, con racha, regularidad, historial y avisos. Lo cruza con tu sueño y VFC, la recuperación y el entreno, la proteína de la ventana, el peso y la glucosa si tienes sensor. Fuera de la app: Actividad en vivo en la pantalla bloqueada y la Dynamic Island, widgets de inicio y de pantalla bloqueada con botón para empezar o terminar, y Siri («Empezar ayuno en Vital», «Cuánto llevo de ayuno en Vital»).
 
 Necesita Xcode. Con el iPhone conectado por cable (desbloqueado y con el Modo desarrollador activado), este script la compila, la instala y la abre:
 
