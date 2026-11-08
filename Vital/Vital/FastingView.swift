@@ -40,6 +40,7 @@ struct FastingCard: View {
                     VStack(alignment: .leading, spacing: 12) {
                         header
                         if let active { running(active) } else { window }
+                        FastingTipRow(sessions: sessions, goal: goal)
                     }
                 }
             }
@@ -323,6 +324,8 @@ struct FastingDetailView: View {
                     .font(.caption2).foregroundStyle(.tertiary)
             }
 
+            FastingInsightSections(sessions: sessions, goal: goal)
+
             Section("Historial") {
                 if sessions.isEmpty { Text("Todavía no hay ayunos").foregroundStyle(.secondary) }
                 ForEach(sessions.prefix(60)) { s in
@@ -429,6 +432,7 @@ struct FastingSummaryCard: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             Card {
+              VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 14) {
                     if let s = sessions.last(where: \.isActive) {
                         FastingRing(progress: s.hours / s.goalHours, reached: s.reachedGoal) { Image(systemName: "timer").font(.callout) }
@@ -453,6 +457,8 @@ struct FastingSummaryCard: View {
                     let streak = FastingStats(sessions: sessions).streak
                     if streak > 0 { Label("\(streak)", systemImage: "flame.fill").font(.callout.bold()).foregroundStyle(.orange) }
                 }
+                FastingTipRow(sessions: sessions, goal: goal)
+              }
             }
         }
     }

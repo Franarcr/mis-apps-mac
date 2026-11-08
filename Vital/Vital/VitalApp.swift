@@ -36,6 +36,10 @@ struct VitalApp: App {
                 // Estrés y energía necesitan la recuperación, el pulso máximo y los entrenamientos de hoy.
                 await stress.load(health: model, training: training)
             }
+            // El ayuno cruza datos de todas las pestañas (sueño, entreno, peso).
+            .environmentObject(model)
+            .environmentObject(training)
+            .environmentObject(bodyData)
             .preferredColorScheme(.dark)
         }
         .modelContainer(container)
