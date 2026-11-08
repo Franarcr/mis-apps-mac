@@ -8,24 +8,29 @@ struct VitalApp: App {
     @StateObject private var bodyData = BodyModel()
     @StateObject private var stress = StressModel()
     @Environment(\.scenePhase) private var scenePhase
+    @State private var tab = "salud"
     private let container = VitalStore.container
 
     var body: some Scene {
         WindowGroup {
-            TabView {
-                Tab("Salud", systemImage: "heart.text.square.fill") {
+            TabView(selection: $tab) {
+                Tab("Salud", systemImage: "heart.text.square.fill", value: "salud") {
                     TodayView(model: model, bodyData: bodyData, stress: stress)
                 }
-                Tab("Entreno", systemImage: "figure.run") {
+                Tab("Entreno", systemImage: "figure.run", value: "entreno") {
                     TrainingView(model: training, health: model)
                 }
-                Tab("Rutinas", systemImage: "dumbbell.fill") {
+                Tab("Rutinas", systemImage: "dumbbell.fill", value: "rutinas") {
                     RoutinesView(health: model)
                 }
-                Tab("Comida", systemImage: "fork.knife") {
+                Tab("Comida", systemImage: "fork.knife", value: "comida") {
                     NutritionView(bodyData: bodyData)
                 }
+                Tab("Ayuno", systemImage: "timer", value: "ayuno") {
+                    FastingTab()
+                }
             }
+            .environment(\.openFastingTab, OpenFastingTab { tab = "ayuno" })
             .task {
                 PhoneWatchLink.shared.activate(container: container)
                 await maintenance()

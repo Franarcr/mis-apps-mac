@@ -35,6 +35,11 @@ struct DailyTargets {
     static let sugarLimit = 50.0
     static let sodiumLimit = 2000.0
 
+    /// Metabolismo basal: el de la báscula si lo hay; si no, una estimación por peso y edad (Mifflin-St Jeor con 175 cm).
+    static func basalRate(weight: Double, age: Int?, female: Bool, scale: Double?) -> Double {
+        scale ?? 10 * weight + 6.25 * 175 - 5 * Double(age ?? 40) + (female ? -161 : 5)
+    }
+
     init(bmr: Double, active: Double, weight: Double, goal: WeightGoal) {
         self.bmr = bmr
         self.active = active
@@ -61,10 +66,7 @@ struct NutritionView: View {
     private var total: Nutrients { dayEntries.map(\.nutrients).reduce(Nutrients(), +) }
 
     private var targets: DailyTargets {
-        // Metabolismo basal: el de la báscula si lo hay; si no, una estimación por peso y edad (Mifflin-St Jeor con 175 cm).
-        let age = Double(bodyData.age ?? 40)
-        let estimated = 10 * weight + 6.25 * 175 - 5 * age + (female ? -161 : 5)
-        let bmr = readings.last?.values[.bmr] ?? estimated
+        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, female: female, scale: readings.last?.values[.bmr])
         return DailyTargets(bmr: bmr, active: activeEnergy, weight: weight, goal: goal)
     }
 
@@ -73,7 +75,6 @@ struct NutritionView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     dayPicker
-                    if Calendar.current.isDateInToday(day) { FastingCard(entries: entries) }
                     SummaryCard(total: total, targets: targets, goal: $goal)
                     ForEach(Meal.allCases) { meal in
                         MealCard(meal: meal, entries: dayEntries.filter { $0.meal == meal.rawValue }) { adding = meal }

@@ -103,7 +103,7 @@ struct FastingStats {
 @MainActor
 enum Fasting {
     /// Registrar comida de 50 kcal o más rompe el ayuno; un café negro o agua con limón no.
-    static let breakingKcal = 50.0
+    nonisolated static let breakingKcal = 50.0
 
     static func active(in context: ModelContext) -> FastingSession? {
         let all = (try? context.fetch(FetchDescriptor<FastingSession>(predicate: #Predicate { $0.end == nil }))) ?? []
