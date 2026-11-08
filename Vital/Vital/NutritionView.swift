@@ -73,6 +73,7 @@ struct NutritionView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     dayPicker
+                    if Calendar.current.isDateInToday(day) { FastingCard(entries: entries) }
                     SummaryCard(total: total, targets: targets, goal: $goal)
                     ForEach(Meal.allCases) { meal in
                         MealCard(meal: meal, entries: dayEntries.filter { $0.meal == meal.rawValue }) { adding = meal }
@@ -668,6 +669,8 @@ private struct FoodAmountView: View {
             // Se registra a la hora actual si es hoy; si es otro día, a mediodía de ese día.
             let date = Calendar.current.isDateInToday(day) ? Date.now : Calendar.current.date(byAdding: .hour, value: 12, to: day)!
             context.insert(FoodEntry(date: date, meal: chosenMeal, food: food, grams: totalGrams))
+            // Comer rompe el ayuno en curso (solo si es comida de verdad y de ahora).
+            if Calendar.current.isDateInToday(day) { Fasting.foodLogged(at: date, kcal: amount.kcal, in: context) }
         }
         if food.source != "tico" {
             // Se guarda (o se corrige) el producto para la próxima vez.

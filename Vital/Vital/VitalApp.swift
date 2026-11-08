@@ -7,7 +7,7 @@ struct VitalApp: App {
     @StateObject private var training = TrainingModel()
     @StateObject private var bodyData = BodyModel()
     @StateObject private var stress = StressModel()
-    private let container = try! ModelContainer(for: Routine.self, RoutineItem.self, SetLog.self, CustomExercise.self, ScaleReading.self, FoodEntry.self, SavedFood.self)
+    private let container = try! ModelContainer(for: Routine.self, RoutineItem.self, SetLog.self, CustomExercise.self, ScaleReading.self, FoodEntry.self, SavedFood.self, FastingSession.self)
 
     var body: some Scene {
         WindowGroup {
@@ -44,6 +44,7 @@ struct VitalApp: App {
     /// Ayudas para probar desde el Mac (se pasan al abrir la app con devicectl o simctl):
     /// - `-leer captura.jpg`: imprime lo que el lector saca de una captura (ruta o archivo en Documentos).
     /// - `-borrar-lecturas-guardadas-el 2026-11-04`: borra las lecturas de la báscula guardadas ese día.
+    /// - `-ayuno-demo`: activa el control de ayuno y carga una semana de ayunos de ejemplo (si no hay ninguno).
     @MainActor private func maintenance() async {
         let args = ProcessInfo.processInfo.arguments
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -61,6 +62,23 @@ struct VitalApp: App {
             doomed.forEach { context.delete($0) }
             try? context.save()
             print("BORRADAS", doomed.count, "de", all.count)
+        }
+        if args.contains("-ayuno-demo") {
+            let context = container.mainContext
+            if ((try? context.fetchCount(FetchDescriptor<FastingSession>())) ?? 0) == 0 {
+                let cal = Calendar.current
+                let today = cal.startOfDay(for: .now)
+                for (daysAgo, startHour, hours) in [(7, 20.0, 15.5), (6, 19.5, 16.2), (5, 21.0, 14.0), (4, 19.75, 16.5), (3, 20.25, 16.1), (2, 19.5, 17.0)] {
+                    let start = cal.date(byAdding: .day, value: -daysAgo, to: today)!.addingTimeInterval(startHour * 3600)
+                    let s = FastingSession(start: start, goalHours: 16)
+                    s.end = start.addingTimeInterval(hours * 3600)
+                    s.endedBy = "comida"
+                    context.insert(s)
+                }
+                context.insert(FastingSession(start: .now.addingTimeInterval(-13.4 * 3600), goalHours: 16))
+                try? context.save()
+            }
+            UserDefaults.standard.set(true, forKey: "ayunoActivo")
         }
     }
 }
