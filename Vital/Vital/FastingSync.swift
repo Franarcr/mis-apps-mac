@@ -62,7 +62,7 @@ enum FastingSync {
 enum FastingActions {
     static func start() -> String {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "ayunoActivo") else { return "Activa el control de ayuno en Vital › Comida." }
+        guard defaults.bool(forKey: "ayunoActivo") else { return "Vital está en «Comer menos». Para ayunar, cambia la estrategia en Ayuno › Plan." }
         let context = VitalStore.container.mainContext
         if let active = Fasting.active(in: context) {
             return "Ya llevas \(fastingDuration(active.hours)) de ayuno."
@@ -84,7 +84,7 @@ enum FastingActions {
 
     static func status() -> String {
         let context = VitalStore.container.mainContext
-        guard UserDefaults.standard.bool(forKey: "ayunoActivo") else { return "El control de ayuno está desactivado." }
+        guard UserDefaults.standard.bool(forKey: "ayunoActivo") else { return "Ahora mismo tu estrategia es «Comer menos», no ayuno." }
         if let active = Fasting.active(in: context) {
             let phase = FastingPhase.at(hours: active.hours).title.lowercased()
             return active.reachedGoal

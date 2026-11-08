@@ -58,7 +58,8 @@ struct StartPickerSheet: View {
 
 struct FastingSafetySheet: View {
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("ayunoActivo") private var enabled = false
+    @Environment(\.modelContext) private var context
+    @AppStorage("ayunoAvisoVisto") private var safetySeen = false
     @AppStorage("ayunoPrecaucion") private var caution = false
     @AppStorage("ayunoMeta") private var goal: Double = 16
     @State private var pregnant = false
@@ -92,16 +93,16 @@ struct FastingSafetySheet: View {
                 }
                 .font(.callout)
             }
-            .navigationTitle("Control de ayuno")
+            .navigationTitle("Antes de ayunar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Activar") {
+                    Button("Empezar") {
                         caution = anyRisk
                         if caution { goal = min(goal, 14) }
-                        enabled = true
-                        FastingSync.refresh()
+                        safetySeen = true
+                        Strategy.useFasting(in: context)
                         dismiss()
                     }.bold()
                 }
@@ -160,11 +161,15 @@ struct FastingEditSheet: View {
 struct FastingSummaryCard: View {
     @Query(sort: \FastingSession.start) private var sessions: [FastingSession]
     @AppStorage("ayunoMeta") private var goal: Double = 16
+    @AppStorage("ayunoActivo") private var enabled = false
     @Environment(\.openFastingTab) private var openFastingTab
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
           Button { openFastingTab() } label: {
+            if !enabled {
+                EatLessSummary()
+            } else {
             Card {
               VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 14) {
@@ -194,8 +199,39 @@ struct FastingSummaryCard: View {
                 FastingTipRow(sessions: sessions, goal: goal)
               }
             }
+            }
           }
           .buttonStyle(.plain)
+        }
+    }
+}
+
+/// En Salud, con la estrategia «Comer menos»: lo comido hoy frente al reto.
+private struct EatLessSummary: View {
+    @Query(sort: \FoodEntry.date) private var entries: [FoodEntry]
+    @Query(sort: \ScaleReading.date) private var readings: [ScaleReading]
+    @EnvironmentObject private var bodyData: BodyModel
+    @AppStorage("pesoCorporal") private var weight: Double = 75
+    @AppStorage("mujer") private var female = false
+    @AppStorage("comerMenosPorcentaje") private var percent: Double = 10
+
+    var body: some View {
+        let today = entries.filter { Calendar.current.isDateInToday($0.date) }.map(\.nutrients.kcal).reduce(0, +)
+        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, female: female, scale: readings.last?.values[.bmr])
+        let challenge = EatLess.challenge(usual: EatLess.usualIntake(entries), bmr: bmr, female: female, percent: percent)
+        let ratio = today / challenge
+        Card {
+            HStack(spacing: 14) {
+                FastingRing(progress: ratio, reached: ratio <= 1) { Image(systemName: "leaf.fill").font(.callout) }
+                    .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Comer menos: \(Int(today)) de \(Int(challenge)) kcal").font(.headline)
+                    Text(today <= challenge ? "Te quedan \(Int(challenge - today)) kcal" : "Te pasaste \(Int(today - challenge)) kcal")
+                        .font(.caption).foregroundStyle(ratio <= 1 ? Color.secondary : .orange)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+            }
         }
     }
 }

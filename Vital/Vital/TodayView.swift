@@ -7,7 +7,6 @@ struct TodayView: View {
     @ObservedObject var stress: StressModel
     @State private var showingInfo = false
     @State private var importingScale = false
-    @AppStorage("ayunoActivo") private var fastingEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -48,7 +47,7 @@ struct TodayView: View {
         }
         RecoveryCard(recovery: model.todayRecovery, live: model.liveRecovery, daysWithHRV: model.daysWithHRV)
         if let result = stress.result { StressEnergyCard(result: result) }
-        if fastingEnabled { FastingSummaryCard() }
+        FastingSummaryCard()
         let tips = Advice.tips(for: model)
         if !tips.isEmpty { TipsCard(tips: tips) }
         if !model.alerts.isEmpty { AlertsCard(alerts: model.alerts) }

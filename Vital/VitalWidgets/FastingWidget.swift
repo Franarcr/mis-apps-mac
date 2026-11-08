@@ -64,12 +64,13 @@ struct FastingWidgetView: View {
             }
         } else {
             switch family {
-            case .accessoryInline: Text("Ayuno: abre Vital")
-            case .accessoryCircular: Image(systemName: "timer")
+            case .accessoryInline: Text("\(Image(systemName: "leaf")) Comer menos")
+            case .accessoryCircular: Image(systemName: "leaf")
             default:
                 VStack(alignment: .leading, spacing: 4) {
-                    Image(systemName: "timer").font(.title2).foregroundStyle(.indigo)
-                    Text("Activa el control de ayuno en Vital › Comida").font(.caption)
+                    Image(systemName: "leaf.fill").font(.title2).foregroundStyle(.green)
+                    Text("Comer menos").font(.headline)
+                    Text("Para ver el ayuno aquí, cambia la estrategia en Vital › Ayuno › Plan.").font(.caption2).foregroundStyle(.secondary)
                 }
             }
         }

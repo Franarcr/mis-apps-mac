@@ -2,8 +2,8 @@ import Charts
 import SwiftData
 import SwiftUI
 
-/// Pestaña «Ayuno»: el ayuno y, los días que no ayunas, «Comer menos». Tres secciones para no amontonar:
-/// Hoy (lo de ahora), Progreso (gráficas e historial) y Plan (ajustes).
+/// Pestaña «Ayuno». Hay una sola estrategia vigente, que se elige en Plan: Ayuno o Comer menos.
+/// Tres secciones para no amontonar: Hoy (lo de ahora), Progreso (gráficas e historial) y Plan (ajustes).
 struct FastingTab: View {
     enum Page: String, CaseIterable, Identifiable {
         case today = "Hoy", progress = "Progreso", plan = "Plan"
@@ -53,6 +53,29 @@ extension EnvironmentValues {
     }
 }
 
+/// La estrategia vigente. «ayunoActivo» encendido = Ayuno; apagado = Comer menos.
+/// Al cambiar, se apaga todo lo de la otra (avisos, Actividad en vivo, widgets).
+@MainActor
+enum Strategy {
+    static func useFasting(in context: ModelContext) {
+        UserDefaults.standard.set(true, forKey: "ayunoActivo")
+        EatLess.scheduleKitchenReminder(enabled: false, hour: 0, minute: 0)
+        FastingSync.refresh(in: context)
+    }
+
+    /// Si había un ayuno en curso, termina ahora.
+    static func useEatLess(in context: ModelContext) {
+        if let active = Fasting.active(in: context) { Fasting.finish(active, in: context) }
+        let d = UserDefaults.standard
+        d.set(false, forKey: "ayunoActivo")
+        FastingNotifications.cancelAll()
+        EatLess.scheduleKitchenReminder(enabled: d.bool(forKey: "cocinaAviso"),
+                                        hour: d.object(forKey: "cocinaHora") as? Int ?? 20,
+                                        minute: d.integer(forKey: "cocinaMinuto"))
+        FastingSync.refresh(in: context)
+    }
+}
+
 // MARK: - Hoy
 
 private struct FastingTodayView: View {
@@ -60,22 +83,31 @@ private struct FastingTodayView: View {
     @Query(sort: \FoodEntry.date) private var entries: [FoodEntry]
     @AppStorage("ayunoActivo") private var enabled = false
     @AppStorage("ayunoMeta") private var goal: Double = 16
-    @AppStorage("comerMenosActivo") private var eatLessOn = true
+    @AppStorage("ayunoPagina") private var page: FastingTab.Page = .today
 
     var body: some View {
         ScrollView {
             TimelineView(.periodic(from: .now, by: 30)) { _ in
                 VStack(spacing: 16) {
-                    if enabled, let active = sessions.last(where: \.isActive) {
-                        FastingNowCard(session: active)
-                        FastingTipRow(sessions: sessions, goal: goal)
-                        FastingPhasesCard(session: active)
+                    if enabled {
+                        if let active = sessions.last(where: \.isActive) {
+                            FastingNowCard(session: active)
+                            FastingTipRow(sessions: sessions, goal: goal)
+                            FastingPhasesCard(session: active)
+                        } else {
+                            FastingStartCard(entries: entries, sessions: sessions)
+                            IntakeLine(entries: entries)
+                            FastingTipRow(sessions: sessions, goal: goal)
+                        }
                     } else {
-                        if eatLessOn { EatLessCard(entries: entries) }
-                        FastingStartCard(entries: entries, sessions: sessions)
-                        if enabled { FastingTipRow(sessions: sessions, goal: goal) }
-                        if eatLessOn { EatLessIdeaCard() }
+                        EatLessCard(entries: entries)
+                        EatLessIdeaCard()
                     }
+                    Button { page = .plan } label: {
+                        Text(enabled ? "Estrategia: Ayuno · cambiar a Comer menos en Plan" : "Estrategia: Comer menos · cambiar a Ayuno en Plan")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 12)
@@ -161,9 +193,7 @@ private struct FastingStartCard: View {
     let entries: [FoodEntry]
     let sessions: [FastingSession]
     @Environment(\.modelContext) private var context
-    @AppStorage("ayunoActivo") private var enabled = false
     @AppStorage("ayunoMeta") private var goal: Double = 16
-    @State private var showingSafety = false
     @State private var pickingStart = false
 
     private var lastFinished: FastingSession? { sessions.last { !$0.isActive } }
@@ -175,12 +205,6 @@ private struct FastingStartCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
-                if !enabled {
-                    Label("Ayuno intermitente", systemImage: "timer").font(.headline)
-                    Text("Cuenta las horas desde tu última comida, te avisa al llegar a la meta y se cierra solo al registrar comida.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    Button("Activar ayuno") { showingSafety = true }.bold().buttonStyle(.borderedProminent).tint(.indigo)
-                } else {
                     Label("Ayuno", systemImage: "timer").font(.headline)
                     if let last = lastFinished, let end = last.end, Date.now.timeIntervalSince(end) < 24 * 3600 {
                         let closes = end.addingTimeInterval((24 - goal) * 3600)
@@ -206,10 +230,8 @@ private struct FastingStartCard: View {
                         Button { pickingStart = true } label: { Text("Otra hora…").frame(maxWidth: .infinity) }
                     }
                     .buttonStyle(.bordered)
-                }
             }
         }
-        .sheet(isPresented: $showingSafety) { FastingSafetySheet() }
         .sheet(isPresented: $pickingStart) { StartPickerSheet(goal: goal) }
     }
 
@@ -285,6 +307,25 @@ private struct EatLessCard: View {
     }
 }
 
+/// En la ventana de ayuno: solo cuánto llevas comido hoy, sin reto.
+private struct IntakeLine: View {
+    let entries: [FoodEntry]
+
+    var body: some View {
+        let today = entries.filter { Calendar.current.isDateInToday($0.date) }
+        let kcal = today.map(\.nutrients.kcal).reduce(0, +)
+        let protein = today.map(\.nutrients.protein).reduce(0, +)
+        Card {
+            HStack {
+                Image(systemName: "fork.knife").foregroundStyle(.secondary)
+                Text(today.isEmpty ? "Hoy aún no registras comida" : "Hoy llevas \(Int(kcal)) kcal · \(Int(protein)) g de proteína")
+                    .font(.callout)
+                Spacer()
+            }
+        }
+    }
+}
+
 /// La idea práctica del día.
 private struct EatLessIdeaCard: View {
     var body: some View {
@@ -310,7 +351,6 @@ private struct FastingProgressList: View {
     @EnvironmentObject private var bodyData: BodyModel
     @AppStorage("ayunoActivo") private var enabled = false
     @AppStorage("ayunoMeta") private var goal: Double = 16
-    @AppStorage("comerMenosActivo") private var eatLessOn = true
     @AppStorage("comerMenosPorcentaje") private var percent: Double = 10
     @AppStorage("pesoCorporal") private var weight: Double = 75
     @AppStorage("mujer") private var female = false
@@ -320,10 +360,13 @@ private struct FastingProgressList: View {
 
     var body: some View {
         List {
-            if enabled || !sessions.isEmpty { fastingWeek }
-            if eatLessOn { eatLessWeek }
-            FastingInsightSections(sessions: sessions, goal: goal)
-            if !sessions.isEmpty { history }
+            if enabled {
+                fastingWeek
+                FastingInsightSections(sessions: sessions, goal: goal)
+                if !sessions.isEmpty { history }
+            } else {
+                eatLessWeek
+            }
         }
         .sheet(item: $editing) { FastingEditSheet(session: $0) }
     }
@@ -423,12 +466,13 @@ private struct FastingPlanList: View {
     @AppStorage("ayunoMeta") private var goal: Double = 16
     @AppStorage("ayunoAvisoVentana") private var windowAlert = true
     @AppStorage("ayunoActividad") private var liveActivity = true
-    @AppStorage("comerMenosActivo") private var eatLessOn = true
     @AppStorage("comerMenosPorcentaje") private var percent: Double = 10
     @AppStorage("cocinaHora") private var closeHour = 20
     @AppStorage("cocinaMinuto") private var closeMinute = 0
     @AppStorage("cocinaAviso") private var kitchenAlert = false
+    @AppStorage("ayunoAvisoVisto") private var safetySeen = false
     @State private var showingSafety = false
+    @State private var confirmingSwitch = false
 
     private var active: FastingSession? { sessions.first { $0.isActive } }
     private var maxGoal: Double { caution ? 14 : 24 }
@@ -440,14 +484,44 @@ private struct FastingPlanList: View {
             let c = Calendar.current.dateComponents([.hour, .minute], from: date)
             closeHour = c.hour ?? 20
             closeMinute = c.minute ?? 0
-            EatLess.scheduleKitchenReminder(enabled: kitchenAlert, hour: closeHour, minute: closeMinute)
+            EatLess.scheduleKitchenReminder(enabled: kitchenAlert && !enabled, hour: closeHour, minute: closeMinute)
+        }
+    }
+
+    /// El selector de estrategia: pasar a Ayuno pide antes el aviso de seguridad (una vez); pasar a Comer menos
+    /// con un ayuno en curso pide confirmación porque lo termina.
+    private var strategy: Binding<Bool> {
+        Binding { enabled } set: { fasting in
+            if fasting {
+                if safetySeen { Strategy.useFasting(in: context) } else { showingSafety = true }
+            } else if active != nil {
+                confirmingSwitch = true
+            } else {
+                Strategy.useEatLess(in: context)
+            }
         }
     }
 
     var body: some View {
         List {
             Section {
-                if enabled {
+                Picker("Estrategia", selection: strategy) {
+                    Text("Ayuno").tag(true)
+                    Text("Comer menos").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            } header: {
+                Text("Estrategia")
+            } footer: {
+                Text(enabled
+                     ? "Ayunas cada día según tu plan. Dentro de la ventana solo ves cuánto llevas comido."
+                     : "Sin ayuno: un reto de calorías un poco por debajo de lo que sueles comer y una hora para cerrar la cocina.")
+            }
+
+            if enabled {
+                Section("Plan de ayuno") {
                     ForEach(FastingPlan.allCases.filter { $0.rawValue <= maxGoal }) { plan in
                         Button { setGoal(plan.rawValue) } label: {
                             HStack {
@@ -467,19 +541,14 @@ private struct FastingPlanList: View {
                         Label("Más de 20 h al día es exigente; no lo hagas a diario sin consultarlo.", systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundStyle(.orange)
                     }
+                }
+                Section("Avisos") {
                     Toggle("Avisar 30 min antes de cerrar la ventana", isOn: $windowAlert)
                     Toggle("Mostrar en la pantalla bloqueada y la Dynamic Island", isOn: $liveActivity)
                         .onChange(of: liveActivity) { FastingSync.refresh(in: context) }
-                } else {
-                    Button("Activar ayuno") { showingSafety = true }.bold()
                 }
-            } header: {
-                Text("Ayuno")
-            }
-
-            Section {
-                Toggle("Mostrar «Comer menos» los días sin ayuno", isOn: $eatLessOn)
-                if eatLessOn {
+            } else {
+                Section {
                     Picker("Reto", selection: $percent) {
                         Text("5 % menos").tag(5.0)
                         Text("10 % menos").tag(10.0)
@@ -490,26 +559,26 @@ private struct FastingPlanList: View {
                         .onChange(of: kitchenAlert) {
                             EatLess.scheduleKitchenReminder(enabled: kitchenAlert, hour: closeHour, minute: closeMinute)
                         }
+                } header: {
+                    Text("Comer menos")
+                } footer: {
+                    Text("El reto es un poco menos de lo que sueles comer, nunca por debajo de tu metabolismo basal. Bajar poco y seguido funciona mejor que dietas duras.")
                 }
-            } header: {
-                Text("Comer menos")
-            } footer: {
-                Text("El reto es un poco menos de lo que sueles comer, nunca por debajo de tu metabolismo basal. Bajar poco y seguido funciona mejor que dietas duras.")
             }
 
-            if enabled {
-                Section {
-                    Button("Desactivar ayuno", role: .destructive) {
-                        FastingNotifications.cancelAll()
-                        enabled = false
-                        FastingSync.refresh(in: context)
-                    }
-                } footer: {
-                    Text("Tu historial se guarda; puedes volver a activarlo cuando quieras.")
-                }
+            Section {
+            } footer: {
+                Text("Al cambiar de estrategia se guarda todo tu historial.")
             }
         }
         .sheet(isPresented: $showingSafety) { FastingSafetySheet() }
+        .confirmationDialog("Tienes un ayuno en curso", isPresented: $confirmingSwitch, titleVisibility: .visible) {
+            Button("Terminarlo y pasar a Comer menos") { Strategy.useEatLess(in: context) }
+            Button("Seguir con el ayuno", role: .cancel) {}
+        } message: {
+            Text("Llevas \(fastingDuration(active?.hours ?? 0)). Al pasar a Comer menos, el ayuno termina ahora y queda en tu historial.")
+        }
+        .onAppear { if enabled { safetySeen = true } }
     }
 
     private func setGoal(_ hours: Double) {
