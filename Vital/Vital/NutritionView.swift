@@ -90,6 +90,12 @@ struct NutritionView: View {
                 AddFoodSheet(meal: meal, day: day)
             }
             .task(id: day) { activeEnergy = await Self.activeEnergy(on: day) }
+            .task {
+                // Los registros de antes de que Vital escribiera en Salud se envían una vez.
+                let pending = entries.filter { $0.healthID == nil }
+                pending.forEach { $0.syncToHealth() }
+                if !pending.isEmpty { try? context.save() }
+            }
         }
         .tint(.white)
     }
@@ -446,6 +452,9 @@ struct LabelEditView: View {
     let onContinue: (Food) -> Void
     /// Se editan los números tal como vienen en la etiqueta: por porción (lo usual en Costa Rica) o por 100 g.
     @State private var perPortion: Bool
+    @State private var shootingIngredients = false
+    @State private var pickedIngredients: PhotosPickerItem?
+    @State private var readingIngredients = false
 
     init(food: Food, buttonTitle: String = "Continuar", onContinue: @escaping (Food) -> Void) {
         _food = State(initialValue: food)
@@ -505,13 +514,36 @@ struct LabelEditView: View {
                     Text("Copia los números tal como aparecen en la etiqueta y corrige los que estén mal.")
                 }
             }
-            Section("Ingredientes") {
+            Section {
+                HStack {
+                    Button { shootingIngredients = true } label: { Label("Tomar foto", systemImage: "camera.fill") }
+                        .buttonStyle(.borderless)
+                    Spacer()
+                    PhotosPicker(selection: $pickedIngredients, matching: .images) { Label("Desde fotos", systemImage: "photo.on.rectangle") }
+                        .buttonStyle(.borderless)
+                }
+                if readingIngredients { HStack { ProgressView(); Text("Leyendo los ingredientes…").foregroundStyle(.secondary) } }
                 TextEditor(text: Binding(get: { food.ingredients ?? "" }, set: { food.ingredients = $0 }))
                     .frame(minHeight: 100)
+            } header: {
+                Text("Ingredientes")
+            } footer: {
+                Text("Fotografía la lista de ingredientes del empaque y se escribe sola; revísala por si algo se leyó mal.")
             }
             Section("Análisis") { LabelAnalysisView(food: food) }
         }
         .tint(.cyan)
+        .sheet(isPresented: $shootingIngredients) {
+            CameraPicker { image in Task { await readIngredients(image) } }.ignoresSafeArea()
+        }
+        .onChange(of: pickedIngredients) {
+            Task {
+                if let data = try? await pickedIngredients?.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                    await readIngredients(image)
+                }
+                pickedIngredients = nil
+            }
+        }
         .navigationTitle("Etiqueta")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -521,6 +553,13 @@ struct LabelEditView: View {
             }
             .disabled(!errors.isEmpty)
         }
+    }
+
+    private func readIngredients(_ image: UIImage) async {
+        readingIngredients = true
+        let text = await NutritionLabelReader.ingredients(image)
+        readingIngredients = false
+        if let text { food.ingredients = text }
     }
 
     private func field(_ title: String, _ key: WritableKeyPath<Nutrients, Double>, _ unit: String) -> some View {
@@ -636,6 +675,7 @@ private struct FoodAmountView: View {
             if let entry {
                 Section {
                     Button("Borrar este registro", role: .destructive) {
+                        entry.removeFromHealth()
                         context.delete(entry)
                         try? context.save()
                         onDone()
@@ -665,10 +705,13 @@ private struct FoodAmountView: View {
             entry.meal = chosenMeal.rawValue
             entry.grams = totalGrams
             entry.foodJSON = String(data: (try? JSONEncoder().encode(food)) ?? Data(), encoding: .utf8) ?? entry.foodJSON
+            entry.syncToHealth()
         } else {
             // Se registra a la hora actual si es hoy; si es otro día, a mediodía de ese día.
             let date = Calendar.current.isDateInToday(day) ? Date.now : Calendar.current.date(byAdding: .hour, value: 12, to: day)!
-            context.insert(FoodEntry(date: date, meal: chosenMeal, food: food, grams: totalGrams))
+            let new = FoodEntry(date: date, meal: chosenMeal, food: food, grams: totalGrams)
+            context.insert(new)
+            new.syncToHealth()
             // Comer rompe el ayuno en curso (solo si es comida de verdad y de ahora).
             if Calendar.current.isDateInToday(day) { Fasting.foodLogged(at: date, kcal: amount.kcal, in: context) }
         }

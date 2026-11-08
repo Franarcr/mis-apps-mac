@@ -40,25 +40,31 @@ struct Recovery {
 
         let (hrvMean, hrvSD) = stats(hrvBase)
         // La VFC varía mucho de un día a otro: la desviación nunca se toma menor que el 5 % de la media.
-        var raw = 0.65 * clamp((hrv - hrvMean) / max(hrvSD, hrvMean * 0.05), -2, 2)
+        // Pesos ajustados a Bevel con 8 días de tus datos (29 oct – 5 nov 2026; error medio ±4 puntos):
+        // la VFC es lo que más pesa, el pulso en reposo ayuda poco y dormir menos de la meta resta.
+        let raw = clamp((hrv - hrvMean) / max(hrvSD, hrvMean * 0.05), -2, 2)
+        var score = 55 + 31 * raw
         if let resting = day.restingHR, let base = baseline(previous, \.restingHR) {
-            raw -= 0.35 * clamp((resting - base.mean) / max(base.sd, 1), -2, 2)
+            score -= 8 * clamp((resting - base.mean) / max(base.sd, 1), -2, 2)
         }
-        var score = 58 + raw * 21
-
         if let sleep = day.sleep {
-            // Dormir menos de la meta resta hasta 20 puntos; dormir de más no suma.
-            score -= 20 * max(0, 1 - sleep.asleep / sleepGoal)
+            // Dormir menos de la meta resta (hasta 26 puntos sin dormir nada); dormir de más no suma.
+            score -= 26 * max(0, 1 - sleep.asleep / sleepGoal)
         }
         if let temp = day.wristTemperature, let mean = baseline(previous, \.wristTemperature)?.mean {
-            // Desde +0,3 °C sobre tu base resta, hasta 15 puntos.
-            score -= clamp((abs(temp - mean) - 0.3) * 25, 0, 15)
+            // Solo la temperatura alta (posible fiebre o infección): desde +0,3 °C sobre tu base, hasta 15 puntos.
+            score -= clamp((temp - mean - 0.3) * 25, 0, 15)
         }
         if let rate = day.respiratoryRate, let mean = baseline(previous, \.respiratoryRate)?.mean {
             score -= clamp((rate - mean - 0.5) * 8, 0, 10)
         }
-        if let oxygen = day.oxygen, oxygen < 95 {
-            score -= clamp((95 - oxygen) * 3, 0, 10)
+        if let oxygen = day.oxygen, let mean = baseline(previous, \.oxygen)?.mean {
+            // SpO₂ más de 1,5 puntos por debajo de tu normal (no de un valor fijo: el reloj de noche suele marcar 92–95 %).
+            score -= clamp((mean - oxygen - 1.5) * 4, 0, 10)
+        }
+        if index >= days.count - 8, ProcessInfo.processInfo.arguments.contains("-depurar") {
+            let rhrBase = baseline(previous, \.restingHR), tBase = baseline(previous, \.wristTemperature), rBase = baseline(previous, \.respiratoryRate)
+            print("RECUP \(day.day.formatted(.dateTime.day().month())) vfc \(hrv) base \(hrvMean)±\(hrvSD) n=\(hrvBase.count) | fcr \(day.restingHR ?? -1) base \(rhrBase?.mean ?? -1)±\(rhrBase?.sd ?? -1) | raw \(raw) | sueño \((day.sleep?.asleep ?? -1) / 3600) | temp \(day.wristTemperature ?? -1) base \(tBase?.mean ?? -1) | fr \(day.respiratoryRate ?? -1) base \(rBase?.mean ?? -1) | spo2 \(day.oxygen ?? -1) | final \(score)")
         }
         return Recovery(score: Int(clamp(score, 1, 99).rounded()))
     }
@@ -95,7 +101,10 @@ final class VitalModel: ObservableObject {
     static let historyDays = 60
 
     var today: DayData? { days.last }
+    /// La de hoy es la primera lectura después de despertar (queda fija todo el día).
     var todayRecovery: Recovery? { today.flatMap { recoveries[$0.day] } }
+    /// La de hoy calculada con los datos de este momento (cambia si el reloj sigue pasando medidas de la noche).
+    @Published var liveRecovery: Recovery?
     var daysWithHRV: Int { days.compactMap(\.hrv).count }
 
     /// Media y desviación de los 30 días anteriores a hoy, o `nil` si hay menos de 7 días con ese dato.
@@ -146,6 +155,23 @@ final class VitalModel: ObservableObject {
         }
     }
 
+    /// Guarda la primera recuperación del día, una vez terminada la noche, y la devuelve desde entonces.
+    /// `-fijar-recuperacion 60` (al abrirla desde el Mac) fija a mano la de hoy.
+    private func fixedScore(for today: DayData, live: Int) -> Int {
+        let key = "recuperacionFijada"
+        let day = ISO8601DateFormatter.dayFormatter.string(from: today.day)
+        var saved = UserDefaults.standard.dictionary(forKey: key) as? [String: Int] ?? [:]
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-fijar-recuperacion"), i + 1 < args.count, let value = Int(args[i + 1]) {
+            saved[day] = value
+        }
+        if saved[day] == nil, let end = today.sleep?.end, end < .now { saved[day] = live }
+        // Solo se guardan las últimas semanas.
+        saved = saved.filter { $0.key >= ISO8601DateFormatter.dayFormatter.string(from: .now.addingTimeInterval(-30 * 86400)) }
+        UserDefaults.standard.set(saved, forKey: key)
+        return saved[day] ?? live
+    }
+
     private func showDemo() {
         heartRate = HeartRateToday(latest: 68, latestDate: .now.addingTimeInterval(-300), minimum: 52, maximum: 131, average: 71)
         alerts = []
@@ -159,6 +185,8 @@ final class VitalModel: ObservableObject {
         for index in loaded.indices {
             if let recovery = Recovery.compute(for: index, in: loaded) { result[loaded[index].day] = recovery }
         }
+        liveRecovery = loaded.last.flatMap { result[$0.day] }
+        if !demo, let today = loaded.last, let live = liveRecovery { result[today.day] = Recovery(score: fixedScore(for: today, live: live.score)) }
         recoveries = result
         state = .ready
     }

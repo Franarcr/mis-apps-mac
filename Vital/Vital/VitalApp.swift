@@ -7,6 +7,7 @@ struct VitalApp: App {
     @StateObject private var training = TrainingModel()
     @StateObject private var bodyData = BodyModel()
     @StateObject private var stress = StressModel()
+    @Environment(\.scenePhase) private var scenePhase
     private let container = try! ModelContainer(for: Routine.self, RoutineItem.self, SetLog.self, CustomExercise.self, ScaleReading.self, FoodEntry.self, SavedFood.self, FastingSession.self)
 
     var body: some Scene {
@@ -26,7 +27,9 @@ struct VitalApp: App {
                 }
             }
             .task {
+                PhoneWatchLink.shared.activate(container: container)
                 await maintenance()
+                await AppExpiry.scheduleReminder()
                 await model.load()
                 await bodyData.load()
                 // El último pesaje de la báscula es el peso corporal con el que se estiman las cargas.
@@ -35,6 +38,11 @@ struct VitalApp: App {
                 await training.load(restingHR: model.baseline(\.restingHR)?.mean)
                 // Estrés y energía necesitan la recuperación, el pulso máximo y los entrenamientos de hoy.
                 await stress.load(health: model, training: training)
+                PhoneWatchLink.shared.publish(health: model, stress: stress)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Al volver a Vital (p. ej. después de editar una rutina o de un entreno), el reloj recibe lo último.
+                if phase == .active, model.state == .ready { PhoneWatchLink.shared.publish(health: model, stress: stress) }
             }
             // El ayuno cruza datos de todas las pestañas (sueño, entreno, peso).
             .environmentObject(model)
@@ -100,7 +108,7 @@ struct VitalApp: App {
     }
 }
 
-private extension ISO8601DateFormatter {
+extension ISO8601DateFormatter {
     static let dayFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withFullDate]

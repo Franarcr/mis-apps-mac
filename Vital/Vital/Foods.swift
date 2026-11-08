@@ -105,6 +105,10 @@ enum TicoFoods {
         f("Olla de carne", 70, 6, 7, 2, sat: 0.7, fib: 1.5, na: 280, [("1 plato", 450)]),
         f("Sopa negra", 90, 5, 12, 2.5, sat: 0.7, fib: 4, na: 300, [("1 plato", 350)]),
         f("Chifrijo", 230, 11, 18, 13, sat: 4, fib: 5, na: 550, [("1 plato", 300)]),
+        f("Pizza (queso o pepperoni)", 266, 11.4, 33, 10, sat: 4.5, fib: 2.3, sug: 3.6, na: 598, [("1 tajada grande", 107)]),
+        f("Taco tico", 230, 9.2, 20, 13, sat: 3, fib: 2.5, sug: 3, na: 400, [("1 taco", 130)]),
+        f("Caldosa con ceviche", 176, 11, 16.6, 6, sat: 1.2, fib: 1.5, sug: 1.5, na: 400, [("1 bolsa preparada", 190)]),
+        f("Quesadilla de queso y jamón", 223, 12, 25.5, 9, sat: 4.5, fib: 3.4, sug: 1, na: 360, [("1 quesadilla", 110)]),
         f("Picadillo de papa", 110, 4, 15, 4, sat: 1.2, fib: 1.8, na: 300, [("1 porción", 120)]),
         f("Picadillo de chayote", 60, 2, 6, 3, sat: 0.8, fib: 1.7, na: 250, [("1 porción", 120)]),
         f("Tamal de cerdo", 190, 6, 20, 10, sat: 3.5, fib: 2, na: 400, [("1 unidad", 250)]),
@@ -125,6 +129,19 @@ enum TicoFoods {
         f("Banano", 89, 1.1, 23, 0.3, fib: 2.6, sug: 12, na: 1, [("1 unidad", 120)]),
         f("Sandía", 30, 0.6, 7.6, 0.2, fib: 0.4, sug: 6.2, na: 1, [("1 taza", 150)]),
         f("Naranja", 47, 0.9, 12, 0.1, fib: 2.4, sug: 9, na: 0, [("1 unidad", 130)]),
+        f("Mandarina", 53, 0.8, 13.3, 0.3, fib: 1.8, sug: 10.6, na: 2, [("1 unidad", 90)]),
+        f("Manzana", 52, 0.3, 14, 0.2, fib: 2.4, sug: 10.4, na: 1, [("1 unidad", 180)]),
+        f("Pera", 57, 0.4, 15, 0.1, fib: 3.1, sug: 9.8, na: 1, [("1 unidad", 180)]),
+        f("Uvas", 69, 0.7, 18, 0.2, fib: 0.9, sug: 15.5, na: 2, [("1 taza", 150), ("10 uvas", 50)]),
+        f("Fresas", 32, 0.7, 7.7, 0.3, fib: 2, sug: 4.9, na: 1, [("1 taza", 150)]),
+        f("Melón", 34, 0.8, 8.2, 0.2, fib: 0.9, sug: 7.9, na: 16, [("1 taza", 160)]),
+        f("Kiwi", 61, 1.1, 14.7, 0.5, fib: 3, sug: 9, na: 3, [("1 unidad", 75)]),
+        f("Guayaba", 68, 2.6, 14.3, 1, fib: 5.4, sug: 8.9, na: 2, [("1 unidad", 55)]),
+        f("Maracuyá", 97, 2.2, 23, 0.7, fib: 10.4, sug: 11, na: 28, [("1 unidad (pulpa)", 18)]),
+        f("Carambola", 31, 1, 6.7, 0.3, fib: 2.8, sug: 4, na: 2, [("1 unidad", 90)]),
+        f("Guanábana", 66, 1, 16.8, 0.3, fib: 3.3, sug: 13.5, na: 14, [("1 taza", 225)]),
+        f("Mamón chino", 68, 0.9, 16.5, 0.2, fib: 0.9, sug: 15, na: 11, [("10 unidades", 100)]),
+        f("Pejibaye cocido", 190, 2.8, 37, 4.4, fib: 3, sug: 1, na: 5, [("1 unidad", 30)]),
         // Bebidas (por 100 ml)
         f("Café negro", 2, 0.3, 0, 0, sug: 0, na: 5, drink: true, [("1 taza", 240)]),
         f("Café con azúcar", 15, 0.3, 3.5, 0, sug: 3.4, na: 5, drink: true, [("1 taza", 240)]),
@@ -133,6 +150,9 @@ enum TicoFoods {
         f("Fresco natural con azúcar", 45, 0.2, 11, 0, sug: 10.5, na: 2, drink: true, [("1 vaso", 250)]),
         f("Coca-Cola", 42, 0, 10.6, 0, sug: 10.6, na: 10, drink: true, [("1 lata", 355), ("1 botella", 600)]),
         f("Cerveza Imperial", 41, 0.4, 3.3, 0, sug: 0, na: 4, drink: true, [("1 lata", 350)]),
+        f("Cerveza Pilsen", 40, 0.3, 3.1, 0, sug: 0, na: 4, drink: true, [("1 lata", 350)]),
+        f("Heineken", 42, 0.3, 3.2, 0, sug: 0, na: 3, drink: true, [("1 botella", 330), ("1 lata", 350)]),
+        f("Stella Artois", 41, 0.3, 3.2, 0, sug: 0, na: 3, drink: true, [("1 botella", 330)]),
         f("Yogurt natural", 61, 3.5, 4.7, 3.3, sat: 2.1, sug: 4.7, na: 46, [("1 vaso", 200)]),
         // Grasas y salsas
         f("Salsa Lizano", 60, 0.5, 14, 0.2, sug: 10, na: 2300, [("1 cucharadita", 5), ("1 cucharada", 15)]),
@@ -151,16 +171,32 @@ final class FoodEntry {
     var meal: String          // `Meal.rawValue`
     var foodJSON: String      // el `Food` completo, para recalcular y volver a registrarlo
     var grams: Double
+    /// Identificador del registro en Salud (nil en los registros anteriores a que Vital escribiera en Salud).
+    var healthID: String?
 
     init(date: Date, meal: Meal, food: Food, grams: Double) {
         self.date = date
         self.meal = meal.rawValue
         foodJSON = String(data: (try? JSONEncoder().encode(food)) ?? Data(), encoding: .utf8) ?? "{}"
         self.grams = grams
+        healthID = UUID().uuidString
     }
 
     var food: Food? { try? JSONDecoder().decode(Food.self, from: Data(foodJSON.utf8)) }
     var nutrients: Nutrients { food?.per100.scaled(grams) ?? Nutrients() }
+
+    /// Envía el registro a Salud (o lo actualiza si ya estaba).
+    func syncToHealth() {
+        if healthID == nil { healthID = UUID().uuidString }
+        let id = healthID!, name = food?.name ?? "Comida", date = date, nutrients = nutrients
+        Task { await HealthWriter.saveFood(id: id, name: name, date: date, nutrients: nutrients) }
+    }
+
+    /// Lo quita de Salud (antes de borrarlo en Vital).
+    func removeFromHealth() {
+        guard let id = healthID else { return }
+        Task { await HealthWriter.deleteFood(id: id) }
+    }
 }
 
 /// Productos escaneados o leídos de etiquetas, para no tener que escanearlos otra vez.

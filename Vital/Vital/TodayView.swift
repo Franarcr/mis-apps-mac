@@ -13,6 +13,7 @@ struct TodayView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    AppExpiryBanner()
                     switch model.state {
                     case .loading:
                         ProgressView("Leyendo Salud…").padding(.top, 120)
@@ -45,7 +46,7 @@ struct TodayView: View {
             Label("Datos de ejemplo (simulador)", systemImage: "flask")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        RecoveryCard(recovery: model.todayRecovery, daysWithHRV: model.daysWithHRV)
+        RecoveryCard(recovery: model.todayRecovery, live: model.liveRecovery, daysWithHRV: model.daysWithHRV)
         if let result = stress.result { StressEnergyCard(result: result) }
         if fastingEnabled { FastingSummaryCard() }
         let tips = Advice.tips(for: model)
@@ -105,7 +106,11 @@ struct Card<Content: View>: View {
 
 private struct RecoveryCard: View {
     let recovery: Recovery?
+    var live: Recovery? = nil
     let daysWithHRV: Int
+
+    /// La lectura del momento, solo si ya no coincide con la fijada al despertar.
+    private var changed: Recovery? { live.flatMap { $0.score != recovery?.score ? $0 : nil } }
 
     var body: some View {
         Card {
@@ -117,11 +122,24 @@ private struct RecoveryCard: View {
                             .trim(from: 0, to: Double(recovery.score) / 100)
                             .stroke(recovery.signal.color.gradient, style: StrokeStyle(lineWidth: 16, lineCap: .round))
                             .rotationEffect(.degrees(-90))
+                        if let changed {
+                            // Anillo interno: la lectura de este momento.
+                            Circle().stroke(.white.opacity(0.08), lineWidth: 6).padding(20)
+                            Circle()
+                                .trim(from: 0, to: Double(changed.score) / 100)
+                                .stroke(changed.signal.color.opacity(0.75), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                                .padding(20)
+                        }
                         VStack(spacing: 0) {
                             Text("\(recovery.score)")
                                 .font(.system(size: 56, weight: .bold, design: .rounded))
                                 .foregroundStyle(recovery.signal.color)
                             Text("RECUPERACIÓN").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                            if let changed {
+                                Text("ahora \(changed.score)").font(.caption.weight(.semibold)).foregroundStyle(changed.signal.color.opacity(0.85))
+                                    .padding(.top, 2)
+                            }
                         }
                     } else {
                         Image(systemName: "hourglass").font(.largeTitle).foregroundStyle(.secondary)
@@ -133,6 +151,10 @@ private struct RecoveryCard: View {
                 if let recovery {
                     Text(recovery.title).font(.title3.bold())
                     Text(recovery.advice).foregroundStyle(.secondary)
+                    if let changed {
+                        Text("Fijada al despertar en \(recovery.score). Con las medidas que el reloj pasó después, ahora sería \(changed.score) (anillo interno).")
+                            .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    }
                 } else {
                     Text("Calibrando").font(.title3.bold())
                     Text("Necesito al menos \(Recovery.minimumBaseline) días con VFC del Apple Watch para conocer tu línea base. Llevo \(daysWithHRV).")

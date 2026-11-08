@@ -64,9 +64,23 @@ enum NutritionLabelReader {
 
     private struct Line { let text: String; let box: CGRect }
 
-    static func read(_ image: UIImage) async -> Result {
-        guard let cg = image.cgImage else { return Result() }
-        let lines: [Line] = await withCheckedContinuation { continuation in
+    /// Solo la lista de ingredientes de una foto: desde «ingredientes» si aparece; si no, todo el texto leído.
+    static func ingredients(_ image: UIImage) async -> String? {
+        let lines = await recognize(image)
+        let start = lines.firstIndex(where: { fold($0.text).contains("ingrediente") }) ?? 0
+        var parts: [String] = []
+        for line in lines.dropFirst(start) {
+            let f = fold(line.text)
+            if !parts.isEmpty && (f.contains("informacion nutricional") || f.hasPrefix("porcion") || f.contains("tamano de la porcion")) { break }
+            parts.append(line.text)
+        }
+        let text = parts.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        return text.isEmpty ? nil : text
+    }
+
+    private static func recognize(_ image: UIImage) async -> [Line] {
+        guard let cg = image.cgImage else { return [] }
+        return await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest { request, _ in
                 let found = (request.results as? [VNRecognizedTextObservation] ?? []).compactMap { obs -> Line? in
                     guard let t = obs.topCandidates(1).first?.string else { return nil }
@@ -80,6 +94,11 @@ enum NutritionLabelReader {
             let orientation = CGImagePropertyOrientation(image.imageOrientation)
             do { try VNImageRequestHandler(cgImage: cg, orientation: orientation).perform([request]) } catch { continuation.resume(returning: []) }
         }
+    }
+
+    static func read(_ image: UIImage) async -> Result {
+        let lines = await recognize(image)
+        guard !lines.isEmpty else { return Result() }
         let norm = lines.map { Line(text: fold($0.text), box: $0.box) }
         var result = Result()
 

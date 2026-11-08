@@ -5,18 +5,54 @@
 	objectVersion = 77;
 	objects = {
 		B1000000000000000000000A /* Vital */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Vital; sourceTree = "<group>"; };
-		B1000000000000000000000B = {isa = PBXGroup; children = (B1000000000000000000000A, B1000000000000000000000C); sourceTree = "<group>"; };
-		B1000000000000000000000C /* Products */ = {isa = PBXGroup; children = (B1000000000000000000000D); name = Products; sourceTree = "<group>"; };
+		B10000000000000000000020 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Shared; sourceTree = "<group>"; };
+		B10000000000000000000021 /* VitalWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; path = VitalWatch; sourceTree = "<group>"; };
+		B1000000000000000000000B = {isa = PBXGroup; children = (B1000000000000000000000A, B10000000000000000000020, B10000000000000000000021, B1000000000000000000000C); sourceTree = "<group>"; };
+		B1000000000000000000000C /* Products */ = {isa = PBXGroup; children = (B1000000000000000000000D, B10000000000000000000022); name = Products; sourceTree = "<group>"; };
 		B1000000000000000000000D /* Vital.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vital.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000022 /* VitalWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VitalWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000023 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		B10000000000000000000024 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		B10000000000000000000025 /* VitalWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B10000000000000000000026 /* Embed Watch Content */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = "$(CONTENTS_FOLDER_PATH)/Watch"; dstSubfolderSpec = 16; files = (B10000000000000000000025); name = "Embed Watch Content"; runOnlyForDeploymentPostprocessing = 0; };
+		B10000000000000000000027 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = B10000000000000000000011; proxyType = 1; remoteGlobalIDString = B10000000000000000000028; remoteInfo = VitalWatch; };
+		B10000000000000000000029 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = B10000000000000000000028; targetProxy = B10000000000000000000027; };
+		B10000000000000000000028 /* VitalWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000000000000000000002A;
+			buildPhases = (B10000000000000000000023, B10000000000000000000024);
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (B10000000000000000000020, B10000000000000000000021);
+			name = VitalWatch;
+			productName = VitalWatch;
+			productReference = B10000000000000000000022;
+			productType = "com.apple.product-type.application";
+		};
+		B1000000000000000000002B /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
+			SDKROOT = watchos; WATCHOS_DEPLOYMENT_TARGET = 11.0; SKIP_INSTALL = YES;
+			CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = CQNAH77456;
+			CODE_SIGN_ENTITLEMENTS = VitalWatch.entitlements;
+			GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = "VitalWatch-Info.plist";
+			ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+			INFOPLIST_KEY_CFBundleDisplayName = Vital;
+			INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.francho.vital;
+			INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+			INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tu pulso y calorías durante el entreno.";
+			INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Vital guarda en Salud los entrenos de tus rutinas.";
+			PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital.watchkitapp; PRODUCT_NAME = "$(TARGET_NAME)";
+			TARGETED_DEVICE_FAMILY = 4; MARKETING_VERSION = 0.1; CURRENT_PROJECT_VERSION = 1;
+		}; name = Debug; };
+		B1000000000000000000002A = {isa = XCConfigurationList; buildConfigurations = (B1000000000000000000002B); defaultConfigurationName = Debug; };
 		B1000000000000000000000E /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		B10000000000000000000015 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		B1000000000000000000000F /* Vital */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B10000000000000000000010;
-			buildPhases = (B1000000000000000000000E, B10000000000000000000015);
+			buildPhases = (B1000000000000000000000E, B10000000000000000000015, B10000000000000000000026);
 			buildRules = ();
-			dependencies = ();
-			fileSystemSynchronizedGroups = (B1000000000000000000000A);
+			dependencies = (B10000000000000000000029);
+			fileSystemSynchronizedGroups = (B1000000000000000000000A, B10000000000000000000020);
 			name = Vital;
 			productName = Vital;
 			productReference = B1000000000000000000000D;
@@ -32,7 +68,7 @@
 			productRefGroup = B1000000000000000000000C;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (B1000000000000000000000F);
+			targets = (B1000000000000000000000F, B10000000000000000000028);
 		};
 		B10000000000000000000013 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
 			SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 18.0; SWIFT_VERSION = 5.0; ALWAYS_SEARCH_USER_PATHS = NO;
@@ -41,8 +77,10 @@
 			CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = CQNAH77456;
 			CODE_SIGN_ENTITLEMENTS = Vital.entitlements;
 			GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+			ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 			INFOPLIST_KEY_CFBundleDisplayName = Vital;
 			INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tus datos del reloj (sueño, pulso, VFC, entrenamientos) y tu peso para calcular recuperación, carga y pesos de tus rutinas. Nada sale de tu iPhone.";
+			INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Vital guarda en Salud lo que comes (calorías y nutrientes) y los entrenos de tus rutinas.";
 			INFOPLIST_KEY_NSCameraUsageDescription = "Vital usa la cámara para escanear códigos de barras y fotografiar etiquetas nutricionales.";
 			INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 			PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital; PRODUCT_NAME = "$(TARGET_NAME)";

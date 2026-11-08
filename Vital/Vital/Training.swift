@@ -166,6 +166,10 @@ final class TrainingModel: ObservableObject {
             let fitness = try await reader.fitness(days: 180)
             vo2 = fitness.vo2
             heartRateRecovery = fitness.recovery
+            if ProcessInfo.processInfo.arguments.contains("-depurar") {
+                for (d, v) in vo2 { print("VO2 \(d.formatted(.iso8601.year().month().day())) \(v)") }
+                for (d, v) in heartRateRecovery { print("RCF \(d.formatted(.iso8601.year().month().day())) \(v)") }
+            }
             #if targetEnvironment(simulator)
             if workouts.isEmpty { showDemo() }
             #endif

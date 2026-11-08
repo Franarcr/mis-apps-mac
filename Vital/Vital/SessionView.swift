@@ -11,6 +11,8 @@ struct SessionView: View {
     @State private var rows: [String: [SetRow]] = [:]
     @State private var suggestions: [String: LoadAdvisor.Suggestion] = [:]
     @State private var confirmingExit = false
+    @State private var saving = false
+    @State private var healthMessage: String?
     private let profile = TrainingProfile()
     private let sessionID = UUID()
     private let started = Date.now
@@ -73,11 +75,16 @@ struct SessionView: View {
                     Button("Salir") { confirmingExit = true }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Terminar") { finish() }.bold()
+                    Button("Terminar") { finish() }.bold().disabled(saving)
                 }
             }
             .confirmationDialog("¿Salir sin guardar?", isPresented: $confirmingExit) {
                 Button("Salir sin guardar", role: .destructive) { dismiss() }
+            }
+            .alert("Entreno guardado", isPresented: Binding(get: { healthMessage != nil }, set: { if !$0 { healthMessage = nil } })) {
+                Button("OK") { dismiss() }
+            } message: {
+                Text(healthMessage ?? "")
             }
             .onAppear(perform: prepare)
         }
@@ -134,15 +141,31 @@ struct SessionView: View {
     }
 
     /// Guarda solo las series marcadas como hechas.
+    /// Y, si hubo series, guarda la sesión en Salud como entrenamiento de fuerza (sin duplicar el del reloj).
     private func finish() {
+        var sets = 0
+        var volume = 0.0
         for item in routine.sortedItems {
             for (index, row) in (rows[item.exerciseID] ?? []).enumerated() where row.done {
                 let kg = profile.unit.store(row.weight ?? 0)
                 context.insert(SetLog(exerciseID: item.exerciseID, date: started, session: sessionID,
                                       weight: kg, reps: row.reps ?? 0, index: index))
+                sets += 1
+                volume += kg * Double(row.reps ?? 0)
             }
         }
         try? context.save()
-        dismiss()
+        guard sets > 0 else { dismiss(); return }
+        saving = true
+        let name = routine.name, start = started
+        Task {
+            let result = await HealthWriter.saveStrengthWorkout(name: name, start: start, end: .now, sets: sets, volumeKg: volume)
+            saving = false
+            switch result {
+            case .saved: healthMessage = "\(sets) series guardadas. El entreno quedó en Salud como entrenamiento de fuerza."
+            case .watchHadIt: healthMessage = "\(sets) series guardadas. El reloj ya grabó este entreno en Salud, así que no se duplicó."
+            case .failed: healthMessage = "\(sets) series guardadas en Vital. No se pudo escribir en Salud (revisa los permisos en Salud > Apps > Vital)."
+            }
+        }
     }
 }
