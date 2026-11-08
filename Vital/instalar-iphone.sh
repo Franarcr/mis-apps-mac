@@ -22,7 +22,7 @@ for a in "$@"; do
     --ayuno-demo) ARGS+=("-ayuno-demo") ;;
     --borrar-demo) ARGS+=("-ayuno-demo-borrar") ;;
     --demo) ARGS+=("-demo") ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "Opción desconocida: $a (usa --help)"; exit 1 ;;
   esac
 done
