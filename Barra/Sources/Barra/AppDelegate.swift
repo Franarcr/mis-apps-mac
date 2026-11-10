@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        let icon = NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: "Barra")
+        let icon = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "Barra")
         icon?.isTemplate = true
         statusItem.button?.image = icon
         let menu = NSMenu()

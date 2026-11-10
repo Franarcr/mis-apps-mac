@@ -8,7 +8,7 @@ BUNDLE_ID="com.fran.barra"
 
 # El icono se genera la primera vez (necesita AppKit, así que solo se puede crear en el Mac).
 if [ ! -f Resources/AppIcon.icns ]; then
-  swift ../iconos/crear-icono.swift ../iconos/$NAME.icns menubar.rectangle "#56CCF2" "#2F80ED"
+  swift ../iconos/crear-icono.swift ../iconos/$NAME.icns square.grid.2x2 "#56CCF2" "#2F80ED"
   cp ../iconos/$NAME.icns Resources/AppIcon.icns
 fi
 
