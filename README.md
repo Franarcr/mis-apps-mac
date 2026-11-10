@@ -16,6 +16,7 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 | [Revela](Revela/) | Editor de fotos (también RAW) con ajustes, looks, LUT .cube y la IA de macOS: desenfocar fondo, luz del sujeto, enderezar horizonte. Inspirado en Luminar | 14+ |
 | [Barra](Barra/) | Junta en un solo icono las demás apps: las desmarcadas esconden su icono y siguen funcionando | 14+ |
 | [Barrendero](Barrendero/) | Limpia Mail cada semana con tus reglas (publicidad, redes, avisos de inicio de sesión, correo no deseado): muestra la lista para confirmar y mueve a la papelera | 14+ |
+| [Guardián](Guardian/) | Avisa cuando alguien entra a tu Mac por AnyDesk (y lo corta si no lo esperabas), y revisa si tus programas son de fiar: firma, permisos, acceso remoto y arranque automático | 14+ |
 | [Historietas](Historietas/) | Lector de cómics CBZ, CBR, CB7 y CBT, con doble página, lectura de manga y la página por la que ibas | 14+ |
 
 Para instalarlas desde los `.zip` de *Releases*, sigue [INSTALAR.md](INSTALAR.md).
