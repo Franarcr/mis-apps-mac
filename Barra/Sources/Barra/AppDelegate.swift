@@ -15,6 +15,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ("com.fran.volumen", "Volumen"),
         ("com.fran.barrendero", "Barrendero"),
     ]
+    /// Apps con ventana: solo se abren desde aquí.
+    private static let windowApps: [(id: String, name: String)] = [
+        ("com.francho.hecho", "Hecho"),
+        ("com.fran.revela", "Revela"),
+        ("com.fran.historietas", "Historietas"),
+        ("com.fran.compresor", "Compresor"),
+        ("com.fran.lazo", "Lazo"),
+        ("com.fran.grabador", "Grabador"),
+    ]
     private static let setHiddenNotification = Notification.Name("com.fran.barra.setHidden")
     private static let showMenuNotification = Notification.Name("com.fran.barra.showMenu")
 
@@ -78,6 +87,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
+        let windowApps = Self.windowApps.compactMap { app in
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.id).map { (name: app.name, url: $0) }
+        }
+        if !windowApps.isEmpty {
+            menu.addItem(.separator())
+            let title = NSMenuItem(title: "Abrir", action: nil, keyEquivalent: "")
+            title.isEnabled = false
+            menu.addItem(title)
+            for app in windowApps {
+                let entry = item("   " + app.name, #selector(launchApp(_:)))
+                entry.representedObject = app.url
+                entry.image = smallIcon(app.url)
+                menu.addItem(entry)
+            }
+        }
+
         menu.addItem(.separator())
         menu.addItem(item("Esconder iconos de otras apps…", #selector(openMenuBarSettings)))
         let login = item("Abrir al iniciar sesión", #selector(toggleLogin))
@@ -123,6 +148,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                completionHandler: nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { post() }
         }
+    }
+
+    /// Abre (o trae al frente) una app con ventana.
+    @objc private func launchApp(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
     }
 
     /// Ajustes del Sistema › Barra de menús, donde macOS deja esconder los iconos de cualquier app.
