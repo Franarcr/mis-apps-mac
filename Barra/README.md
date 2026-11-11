@@ -1,6 +1,6 @@
 # Barra
 
-App de barra de menú para macOS (14+) que junta en un solo icono las demás apps de barra de menús de este repositorio (Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen y Barrendero), para que la barra no se llene, sobre todo en los MacBook con *notch*.
+App de barra de menú para macOS (14+) que junta en un solo icono las demás apps de barra de menús de este repositorio (Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen, Barrendero y Guardián), para que la barra no se llene, sobre todo en los MacBook con *notch*.
 
 - Un clic en su icono muestra la lista de esas apps, cada una con una marca.
 - **Desmarcar** una app esconde su icono de la barra, pero la app **sigue funcionando**: sus atajos de teclado (por ejemplo ⌥⇧2 de Captura o ⌥⇧V de Portapapeles) y todo lo que hace siguen igual.

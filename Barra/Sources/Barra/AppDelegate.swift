@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ("com.fran.ventanas", "Ventanas"),
         ("com.fran.volumen", "Volumen"),
         ("com.fran.barrendero", "Barrendero"),
+        ("com.fran.guardian", "Guardián"),
     ]
     /// Apps con ventana: solo se abren desde aquí.
     private static let windowApps: [(id: String, name: String)] = [
