@@ -35,9 +35,10 @@ struct DailyTargets {
     static let sugarLimit = 50.0
     static let sodiumLimit = 2000.0
 
-    /// Metabolismo basal: el de la báscula si lo hay; si no, una estimación por peso y edad (Mifflin-St Jeor con 175 cm).
-    static func basalRate(weight: Double, age: Int?, female: Bool, scale: Double?) -> Double {
-        scale ?? 10 * weight + 6.25 * 175 - 5 * Double(age ?? 40) + (female ? -161 : 5)
+    /// Metabolismo basal: el de la báscula si lo hay; si no, Mifflin-St Jeor con tu peso, edad y estatura de Salud
+    /// (175 cm si no está; cada 10 cm de diferencia cambian ~60 kcal).
+    static func basalRate(weight: Double, age: Int?, height: Double? = nil, female: Bool, scale: Double?) -> Double {
+        scale ?? 10 * weight + 6.25 * (height ?? 175) - 5 * Double(age ?? 40) + (female ? -161 : 5)
     }
 
     init(bmr: Double, active: Double, weight: Double, goal: WeightGoal) {
@@ -66,7 +67,7 @@ struct NutritionView: View {
     private var total: Nutrients { dayEntries.map(\.nutrients).reduce(Nutrients(), +) }
 
     private var targets: DailyTargets {
-        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, female: female, scale: readings.last?.values[.bmr])
+        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, height: bodyData.height, female: female, scale: readings.last?.values[.bmr])
         return DailyTargets(bmr: bmr, active: activeEnergy, weight: weight, goal: goal)
     }
 
@@ -95,7 +96,20 @@ struct NutritionView: View {
                 // Los registros de antes de que Vital escribiera en Salud se envían una vez.
                 let pending = entries.filter { $0.healthID == nil }
                 pending.forEach { $0.syncToHealth() }
-                if !pending.isEmpty { try? context.save() }
+                // Productos de foto con calorías imposibles (una mala lectura): se corrigen con los macros y en Salud.
+                var fixed = !pending.isEmpty
+                for entry in entries {
+                    guard var food = entry.food, food.fixImpossibleKcal() else { continue }
+                    entry.foodJSON = food.json
+                    entry.syncToHealth()
+                    fixed = true
+                }
+                for item in (try? context.fetch(FetchDescriptor<SavedFood>())) ?? [] {
+                    guard var food = item.food, food.fixImpossibleKcal() else { continue }
+                    item.foodJSON = food.json
+                    fixed = true
+                }
+                if fixed { try? context.save() }
             }
         }
         .tint(.white)
@@ -171,6 +185,8 @@ private struct SummaryCard: View {
                     limit("Sodio", total.sodium ?? 0, DailyTargets.sodiumLimit, "mg")
                     limit("Fibra", total.fiber ?? 0, 30, "g", higherIsGood: true)
                 }
+                Text("Azúcares totales (incluyen los de la leche y la fruta). La OMS pide menos de 50 g al día de azúcar añadido, e idealmente menos de 25 g.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
         }
     }
@@ -416,7 +432,8 @@ struct AddFoodSheet: View {
         looking = nil
         var food = Food(id: "etiqueta-\(UUID().uuidString)", name: "", per100: read.per100,
                         portions: read.portion.map { [Portion(name: "1 porción", grams: $0)] } ?? [],
-                        isDrink: read.isDrink, ingredients: read.ingredients, source: "etiqueta")
+                        isDrink: read.isDrink, ingredients: read.ingredients, source: "etiqueta",
+                        kcalEstimated: read.kcalFromMacros ? true : nil)
         if let code = notFound { food.barcode = code; food.id = "codigo-\(code)" }
         notFound = nil
         path.append(.label(food))
@@ -472,6 +489,13 @@ struct LabelEditView: View {
 
     var body: some View {
         Form {
+            if food.kcalEstimated == true {
+                Section {
+                    Label("No se pudieron leer bien las calorías. Se calcularon con la grasa, los carbohidratos y la proteína (\(Int((food.per100.kcal * factor).rounded())) kcal). Compáralas con la etiqueta y corrígelas si hace falta.",
+                          systemImage: "exclamationmark.octagon.fill")
+                        .foregroundStyle(.red)
+                }
+            }
             Section("Producto") {
                 TextField("Nombre", text: $food.name)
                 TextField("Marca", text: Binding(get: { food.brand ?? "" }, set: { food.brand = $0.isEmpty ? nil : $0 }))
@@ -550,6 +574,7 @@ struct LabelEditView: View {
         .toolbar {
             Button(buttonTitle) {
                 if food.name.trimmingCharacters(in: .whitespaces).isEmpty { food.name = "Producto" }
+                food.kcalEstimated = nil
                 onContinue(food)
             }
             .disabled(!errors.isEmpty)

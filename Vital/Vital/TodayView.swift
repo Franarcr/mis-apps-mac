@@ -45,7 +45,8 @@ struct TodayView: View {
             Label("Datos de ejemplo (simulador)", systemImage: "flask")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        RecoveryCard(recovery: model.todayRecovery, live: model.liveRecovery, daysWithHRV: model.daysWithHRV)
+        RecoveryCard(recovery: model.todayRecovery, live: model.todayRecovery.flatMap { r in stress.result?.charge(recovery: r.score) }.map(Recovery.init),
+                     daysWithHRV: model.daysWithHRV, provisionalUntil: model.provisionalUntil)
         if let result = stress.result { StressEnergyCard(result: result) }
         FastingSummaryCard()
         let tips = Advice.tips(for: model)
@@ -107,8 +108,9 @@ private struct RecoveryCard: View {
     let recovery: Recovery?
     var live: Recovery? = nil
     let daysWithHRV: Int
+    var provisionalUntil: Date? = nil
 
-    /// La lectura del momento, solo si ya no coincide con la fijada al despertar.
+    /// Lo que queda de la recuperación en este momento, solo si ya bajó de la de la mañana.
     private var changed: Recovery? { live.flatMap { $0.score != recovery?.score ? $0 : nil } }
 
     var body: some View {
@@ -122,7 +124,7 @@ private struct RecoveryCard: View {
                             .stroke(recovery.signal.color.gradient, style: StrokeStyle(lineWidth: 16, lineCap: .round))
                             .rotationEffect(.degrees(-90))
                         if let changed {
-                            // Anillo interno: la lectura de este momento.
+                            // Anillo interno: lo que queda ahora (baja con el día).
                             Circle().stroke(.white.opacity(0.08), lineWidth: 6).padding(20)
                             Circle()
                                 .trim(from: 0, to: Double(changed.score) / 100)
@@ -150,14 +152,25 @@ private struct RecoveryCard: View {
                 if let recovery {
                     Text(recovery.title).font(.title3.bold())
                     Text(recovery.advice).foregroundStyle(.secondary)
+                    if let until = provisionalUntil {
+                        Label("Provisional: queda fija a las \(until.formatted(date: .omitted, time: .shortened)), cuando el reloj termina de pasar los datos de la noche.",
+                              systemImage: "hourglass")
+                            .font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
+                    }
                     if let changed {
-                        Text("Fijada al despertar en \(recovery.score). Con las medidas que el reloj pasó después, ahora sería \(changed.score) (anillo interno).")
+                        Text("Al despertar: \(recovery.score). Con las horas despierto, el entreno y el estrés de hoy te queda \(changed.score) (anillo interno).")
                             .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                 } else {
-                    Text("Calibrando").font(.title3.bold())
-                    Text("Necesito al menos \(Recovery.minimumBaseline) días con VFC del Apple Watch para conocer tu línea base. Llevo \(daysWithHRV).")
-                        .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    if daysWithHRV >= Recovery.minimumBaseline {
+                        Text("Esperando la noche").font(.title3.bold())
+                        Text("El reloj aún no pasó la VFC de anoche. Usa el reloj para dormir y abre Vital un rato después de despertar.")
+                            .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    } else {
+                        Text("Calibrando").font(.title3.bold())
+                        Text("Necesito al menos \(Recovery.minimumBaseline) días con VFC del Apple Watch para conocer tu línea base. Llevo \(daysWithHRV).")
+                            .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    }
                 }
             }
             .frame(maxWidth: .infinity)

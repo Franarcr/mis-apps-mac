@@ -37,7 +37,7 @@ final class PhoneWatchLink: NSObject, ObservableObject {
 
         let today = health.today
         let snapshot = WatchSnapshot(
-            date: .now, recovery: health.todayRecovery?.score, live: health.liveRecovery?.score,
+            date: .now, recovery: health.todayRecovery?.score, live: health.todayRecovery.flatMap { stress.result?.charge(recovery: $0.score) },
             sleepHours: today?.sleep.map { $0.asleep / 3600 }, hrv: today?.hrv, hrvBase: health.baseline(\.hrv)?.mean,
             restingHR: today?.restingHR, restingBase: health.baseline(\.restingHR)?.mean,
             stress: stress.result?.currentStress, energy: stress.result?.currentEnergy, expiry: AppExpiry.date)

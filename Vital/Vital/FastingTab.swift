@@ -257,7 +257,7 @@ private struct EatLessCard: View {
     var body: some View {
         let cal = Calendar.current
         let today = entries.filter { cal.isDateInToday($0.date) }.map(\.nutrients.kcal).reduce(0, +)
-        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, female: female, scale: readings.last?.values[.bmr])
+        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, height: bodyData.height, female: female, scale: readings.last?.values[.bmr])
         let usual = EatLess.usualIntake(entries)
         let challenge = EatLess.challenge(usual: usual, bmr: bmr, female: female, percent: percent)
         let left = challenge - today
@@ -394,7 +394,7 @@ private struct FastingProgressList: View {
 
     @ViewBuilder private var eatLessWeek: some View {
         let days = EatLess.pastDays(entries)
-        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, female: female, scale: readings.last?.values[.bmr])
+        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, height: bodyData.height, female: female, scale: readings.last?.values[.bmr])
         let challenge = EatLess.challenge(usual: EatLess.usualIntake(entries), bmr: bmr, female: female, percent: percent)
         let logged = days.filter { $0.kcal >= 500 }
         Section {

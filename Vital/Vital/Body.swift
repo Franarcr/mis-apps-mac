@@ -79,6 +79,8 @@ final class BodyModel: ObservableObject {
     @Published var loaded = false
     /// Edad (de la fecha de nacimiento en Salud), para comparar con la edad corporal de la báscula.
     @Published var age: Int?
+    /// Estatura en cm (la última de Salud), para el metabolismo basal.
+    @Published var height: Double?
     private let store = HKHealthStore()
 
     var latestWeight: Double? { series[.weight]?.last?.value }
@@ -88,9 +90,16 @@ final class BodyModel: ObservableObject {
         guard HKHealthStore.isHealthDataAvailable() else { loaded = true; return }
         var types: Set<HKObjectType> = Set(BodyMetric.allCases.map(\.type))
         types.insert(HKCharacteristicType(.dateOfBirth))
+        types.insert(HKQuantityType(.height))
         try? await store.requestAuthorization(toShare: [], read: types)
         if let year = (try? store.dateOfBirthComponents())?.year {
             age = Calendar.current.component(.year, from: .now) - year
+        }
+        let heightQuery = HKSampleQueryDescriptor(predicates: [.quantitySample(type: HKQuantityType(.height))],
+                                                  sortDescriptors: [SortDescriptor(\.startDate, order: .reverse)], limit: 1)
+        if let cm = (try? await heightQuery.result(for: store))?.first?.quantity.doubleValue(for: .meterUnit(with: .centi)),
+           (120...230).contains(cm) {
+            height = cm
         }
         let from = Calendar.current.date(byAdding: .day, value: -365, to: .now)!
         var result: [BodyMetric: [(Date, Double)]] = [:]

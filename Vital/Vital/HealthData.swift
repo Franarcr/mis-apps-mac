@@ -8,7 +8,11 @@ struct DayData: Identifiable {
     var sleep: SleepNight?
     /// VFC (SDNN) en milisegundos: la media durante el sueño, o la del día si no hay sueño registrado.
     var hrv: Double?
+    /// Pulso en reposo que calcula Apple: una muestra por día que se va reescribiendo hasta la noche
+    /// (sube con lo que hagas después de despertar). No sirve para la recuperación de la mañana.
     var restingHR: Double?
+    /// Pulso medio mientras dormías: no cambia después de despertar. Es el que usa la recuperación.
+    var sleepingHR: Double?
     var respiratoryRate: Double?
     /// Saturación de oxígeno en %, media durante el sueño.
     var oxygen: Double?
@@ -117,14 +121,21 @@ final class HealthReader {
         async let oxygenSamples = quantitySamples(oxygenType, range)
         async let temperatureSamples = quantitySamples(temperatureType, range)
         async let disturbanceSamples = quantitySamples(disturbancesType, range)
+        async let heartSamples = quantitySamples(heartRateType, range)
 
         let nights = groupSleep(try await sleepSamples)
         let hrv = try await hrvSamples
         let resting = try await restingSamples
+        if ProcessInfo.processInfo.arguments.contains("-depurar") {
+            for r in resting.suffix(30) {
+                print("FCR \(r.startDate.formatted(date: .abbreviated, time: .shortened)) → \(r.endDate.formatted(date: .omitted, time: .shortened)) \(r.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))) \(r.sourceRevision.source.name)")
+            }
+        }
         let respiratory = try await respiratorySamples
         let oxygen = try await oxygenSamples
         let temperature = try await temperatureSamples
         let disturbances = try await disturbanceSamples
+        let heart = try await heartSamples
         let ms = HKUnit.secondUnit(with: .milli)
         let perMinute = HKUnit.count().unitDivided(by: .minute())
 
@@ -134,6 +145,7 @@ final class HealthReader {
             var data = DayData(day: day, sleep: nights[day])
             if let night = data.sleep {
                 data.hrv = mean(hrv.filter { $0.startDate >= night.start && $0.startDate <= night.end }, ms)
+                data.sleepingHR = mean(heart.filter { $0.startDate >= night.start && $0.startDate <= night.end }, perMinute)
                 data.respiratoryRate = mean(respiratory.filter { $0.startDate >= night.start && $0.startDate <= night.end }, perMinute)
                 data.oxygen = mean(oxygen.filter { $0.startDate >= night.start && $0.startDate <= night.end }, .percent())
                     .map { $0 * 100 }
@@ -141,9 +153,8 @@ final class HealthReader {
             // La temperatura de la muñeca es una sola medida por noche: va con la mañana en que termina.
             data.wristTemperature = mean(temperature.filter { nightDay($0.endDate) == day }, .degreeCelsius())
             data.breathingDisturbances = mean(disturbances.filter { nightDay($0.endDate) == day }, Self.perHour)
-            if data.hrv == nil {
-                data.hrv = mean(hrv.filter { $0.startDate >= day && $0.startDate < next }, ms)
-            }
+            // Solo la VFC de la noche: la de día es ~30 % más baja y compararla con tu base de la noche
+            // daría una recuperación falsamente baja. Sin VFC de la noche, ese día no tiene recuperación.
             data.restingHR = mean(resting.filter { $0.startDate >= day && $0.startDate < next }, perMinute)
             return data
         }
@@ -176,36 +187,58 @@ final class HealthReader {
     }
 
     /// Agrupa el sueño por la mañana en que termina: lo que acaba antes de las 18 h es la noche de ese día.
+    /// Las siestas no cuentan: si entre dos ratos de sueño hay más de 2 h despierto, son sueños distintos
+    /// y la noche es el más largo (así una siesta a las 2 p. m. no mueve la hora de despertar).
     private func groupSleep(_ samples: [HKCategorySample]) -> [Date: SleepNight] {
+        let byDay = Dictionary(grouping: samples.filter { isSleepPart($0) }) { nightDay($0.endDate) }
         var nights: [Date: SleepNight] = [:]
+        for (day, list) in byDay {
+            var blocks: [[HKCategorySample]] = []
+            var blockEnd = Date.distantPast
+            for sample in list.sorted(by: { $0.startDate < $1.startDate }) {
+                if blocks.isEmpty || sample.startDate.timeIntervalSince(blockEnd) > 2 * 3600 {
+                    blocks.append([sample])
+                } else {
+                    blocks[blocks.count - 1].append(sample)
+                }
+                blockEnd = max(blockEnd, sample.endDate)
+            }
+            let built = blocks.map(night(from:))
+            if let main = built.max(by: { $0.asleep < $1.asleep }), main.asleep > 0 { nights[day] = main }
+        }
+        return nights
+    }
+
+    /// Solo las fases de sueño y lo despierto en medio («en cama» no cuenta).
+    private func isSleepPart(_ sample: HKCategorySample) -> Bool {
+        switch HKCategoryValueSleepAnalysis(rawValue: sample.value) {
+        case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified, .awake: true
+        default: false
+        }
+    }
+
+    private func night(from samples: [HKCategorySample]) -> SleepNight {
+        var night = SleepNight(start: samples.map(\.startDate).min()!, end: samples.map(\.endDate).max()!)
         for sample in samples {
-            let day = nightDay(sample.endDate)
             let duration = sample.endDate.timeIntervalSince(sample.startDate)
-            var night = nights[day] ?? SleepNight(start: sample.startDate, end: sample.endDate)
-            night.start = min(night.start, sample.startDate)
-            night.end = max(night.end, sample.endDate)
             switch HKCategoryValueSleepAnalysis(rawValue: sample.value) {
             case .asleepCore: night.core += duration
             case .asleepDeep: night.deep += duration
             case .asleepREM: night.rem += duration
             case .asleepUnspecified: night.unspecified += duration
             case .awake: night.awake += duration
-            default: break // En cama: no cuenta como sueño.
+            default: break
             }
-            nights[day] = night
         }
         // Si varias fuentes (reloj e iPhone) registran lo mismo, el sueño se contaría dos veces:
         // se recorta a lo que cabe entre el inicio y el final de la noche.
-        for (day, var night) in nights {
-            let span = night.end.timeIntervalSince(night.start)
-            if night.asleep + night.awake > span, night.asleep > 0 {
-                let factor = span / (night.asleep + night.awake)
-                night.core *= factor; night.deep *= factor; night.rem *= factor
-                night.unspecified *= factor; night.awake *= factor
-                nights[day] = night
-            }
+        let span = night.end.timeIntervalSince(night.start)
+        if night.asleep + night.awake > span, night.asleep > 0 {
+            let factor = span / (night.asleep + night.awake)
+            night.core *= factor; night.deep *= factor; night.rem *= factor
+            night.unspecified *= factor; night.awake *= factor
         }
-        return nights.filter { $0.value.asleep > 0 }
+        return night
     }
 
     /// Lo que termina antes de las 18 h cuenta para ese día; lo que termina después, para el siguiente.

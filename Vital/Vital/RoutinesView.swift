@@ -36,6 +36,21 @@ struct RoutinesView: View {
                         .padding(.vertical, 6)
                     }
                 }
+                if let draft = SessionDraft.load(), let routine = routines.first(where: { SessionDraft.key(for: $0) == draft.routineKey }) {
+                    Section {
+                        Button {
+                            session = routine
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("Retomar sesión: \(routine.name)", systemImage: "arrow.uturn.forward.circle.fill")
+                                    .font(.headline)
+                                Text("Empezaste el \(draft.started.formatted(.dateTime.weekday(.wide))) a las \(draft.started.formatted(date: .omitted, time: .shortened)) · Tus series marcadas ya están guardadas.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .tint(.green)
+                    }
+                }
                 ForEach(routines) { routine in
                     Section {
                         NavigationLink(value: routine) {

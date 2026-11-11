@@ -4,9 +4,10 @@ import SwiftUI
 
 /// Estrés y energía del día, al estilo de Bevel (su fórmula no es pública; esta es la nuestra).
 ///
-/// - **Estrés (5–100), cada 15 minutos, solo estando quieto:** en calma ronda 15; sube con el pulso sobre el de
-///   reposo y, un poco, si la VFC cae bajo lo normal de día. No cuentan como estrés: entrenar, moverse (pasos)
-///   ni la hora y media siguiente a un entrenamiento, en la que el pulso sigue alto mientras te recuperas.
+/// - **Estrés (5–100), cada 15 minutos, solo estando quieto:** en calma ronda 15; sube con el pulso sobre tu pulso
+///   normal de día sentado (sacado de tus últimas 2 semanas, no del de la noche) y, un poco, si la VFC cae bajo lo
+///   normal de día. No cuentan como estrés: entrenar, moverse (pasos) ni el rato después de entrenar mientras el
+///   pulso todavía no vuelve a tu normal (según tus horas de entreno en el reloj; como máximo 4 h).
 /// - **Energía (0–100):** al despertar parte de tu recuperación; se gasta un poco por estar despierto, más con
 ///   el entrenamiento (según su esfuerzo), el movimiento y el estrés, y se recarga en los ratos de calma.
 enum StressEnergy {
@@ -27,10 +28,30 @@ enum StressEnergy {
         var dayStress: Int? { restValues.isEmpty ? nil : Int((restValues.reduce(0, +) / Double(restValues.count)).rounded()) }
         var currentStress: Int? { buckets.last(where: { $0.kind == .rest && $0.stress != nil })?.stress.map { Int($0.rounded()) } }
         var currentEnergy: Int? { energy.last.map { Int($0.value.rounded()) } }
+        /// Lo que queda de la recuperación de la mañana: arranca igual al despertar y baja con las horas despierto,
+        /// el entrenamiento, el movimiento y el estrés. Nunca pasa de la de la mañana.
+        func charge(recovery: Int) -> Int? {
+            guard let first = energy.first?.value, first > 0, let now = energy.last?.value else { return nil }
+            return min(recovery, max(1, Int((Double(recovery) * now / first).rounded())))
+        }
         /// Minutos del día en cada nivel de estrés (bajo, medio, alto).
         var minutesByLevel: (low: Int, medium: Int, high: Int) {
             (restValues.filter { $0 < 30 }.count * 15, restValues.filter { (30..<60).contains($0) }.count * 15,
              restValues.filter { $0 >= 60 }.count * 15)
+        }
+    }
+
+    /// Tu pulso de día sentado, de las últimas 2 semanas (sin entrenos ni sueño): la mediana es tu calma normal
+    /// y el percentil 75 el límite de lo normal (por encima, después de entrenar, sigues recuperándote).
+    struct CalmPulse {
+        let median: Double
+        let upperNormal: Double
+
+        init?(_ values: [Double]) {
+            guard values.count >= 200 else { return nil }
+            let sorted = values.sorted()
+            median = sorted[sorted.count / 2]
+            upperNormal = sorted[sorted.count * 3 / 4]
         }
     }
 
@@ -43,34 +64,44 @@ enum StressEnergy {
 
     static func compute(heartRate: [(date: Date, bpm: Double, sedentary: Bool)], hrv: [(date: Date, ms: Double)],
                         steps: [(date: Date, count: Double)],
-                        restingHR: Double, maximumHR: Double, baselineHRV: Double?,
+                        restingHR: Double, maximumHR: Double, baselineHRV: Double?, calm: CalmPulse? = nil,
                         wake: Date?, recovery: Int?, workouts: [Workout], now: Date = .now) -> Result {
         let calendar = Calendar.current
         let start = wake ?? calendar.date(bySettingHour: 6, minute: 0, second: 0, of: now)!
         let reserve = max(20, maximumHR - restingHR)
         // La VFC de día es más baja que la de la noche (tu base): se compara con ~70 % de ella.
         let dayHRV = baselineHRV.map { $0 * 0.7 }
+        // Pulso de referencia: tu pulso normal de día sentado; sin suficiente historial, el de reposo.
+        let reference = calm?.median ?? restingHR
         var buckets: [Bucket] = []
         var time = start
+        // Después de entrenar: «recuperando» hasta que el pulso vuelve a tu rango normal (o 4 h como máximo).
+        var backToNormal: Set<Date> = []
         while time < now {
             let end = time.addingTimeInterval(bucket)
             let samples = heartRate.filter { $0.date >= time && $0.date < end }
+            let average = samples.isEmpty ? nil : samples.map(\.bpm).reduce(0, +) / Double(samples.count)
             let stepCount = steps.filter { $0.date >= time && $0.date < end }.map(\.count).reduce(0, +)
+            let lastWorkout = workouts.filter { $0.end <= time }.max(by: { $0.end < $1.end })
             let kind: Kind
             if workouts.contains(where: { $0.start < end && $0.end > time }) {
                 kind = .workout
-            } else if workouts.contains(where: { $0.end <= time && time.timeIntervalSince($0.end) < 90 * 60 }) {
+            } else if let w = lastWorkout, !backToNormal.contains(w.end), time.timeIntervalSince(w.end) < 4 * 3600,
+                      let average, average > (calm?.upperNormal ?? restingHR) {
                 kind = .recovering
+            } else if stepCount >= movingSteps || samples.filter({ !$0.sedentary }).count * 2 > samples.count {
+                if let w = lastWorkout { backToNormal.insert(w.end) }
+                kind = .moving
             } else if stepCount >= movingSteps || samples.filter({ !$0.sedentary }).count * 2 > samples.count {
                 kind = .moving
             } else {
+                if let w = lastWorkout { backToNormal.insert(w.end) }
                 kind = .rest
             }
             var stress: Double?
-            if kind == .rest, !samples.isEmpty {
-                let hr = samples.map(\.bpm).reduce(0, +) / Double(samples.count)
-                // Pulso: en tu reposo, 15 (calma); con reposo + 40 % de tu reserva cardiaca, 100.
-                var s = 0.15 + 0.85 * (hr - restingHR) / (0.4 * reserve)
+            if kind == .rest, let hr = average {
+                // Pulso: en tu pulso normal de día sentado, 15 (calma); 40 % de tu reserva cardiaca más arriba, 100.
+                var s = 0.15 + 0.85 * (hr - reference) / (0.4 * reserve)
                 // VFC cercana (±90 min): por debajo de lo normal de día suma estrés; por encima, resta.
                 if let reference = dayHRV,
                    let near = hrv.min(by: { abs($0.date.timeIntervalSince(time)) < abs($1.date.timeIntervalSince(time)) }),
@@ -84,7 +115,8 @@ enum StressEnergy {
         }
 
         // Energía: parte de la recuperación de la noche.
-        var energy = 35 + 0.65 * Double(recovery ?? 50)
+        let startEnergy = 35 + 0.65 * Double(recovery ?? 50)
+        var energy = startEnergy
         var curve: [(Date, Double)] = [(start, energy)]
         for b in buckets {
             let end = b.start.addingTimeInterval(bucket)
@@ -106,7 +138,8 @@ enum StressEnergy {
                     if s < 30 { delta += 0.8 }                 // la calma recarga un poco
                 }
             }
-            energy = min(100, max(0, energy + delta))
+            // La calma recarga lo gastado, pero no da más energía que la de la mañana (eso solo lo hace dormir).
+            energy = min(startEnergy, max(0, energy + delta))
             curve.append((min(end, now), energy))
         }
         return Result(buckets: buckets, energy: curve)
@@ -145,6 +178,20 @@ enum StressReader {
         return (hr, hrv, steps)
     }
 
+    /// Pulso estando quieto de los últimos `days` días antes de hoy (para tu pulso normal de día).
+    static func calmHistory(days: Int) async -> [(date: Date, bpm: Double)] {
+        let today = Calendar.current.startOfDay(for: .now)
+        let from = Calendar.current.date(byAdding: .day, value: -days, to: today)!
+        let range = HKQuery.predicateForSamples(withStart: from, end: today)
+        let perMinute = HKUnit.count().unitDivided(by: .minute())
+        let descriptor = HKSampleQueryDescriptor(predicates: [.quantitySample(type: HKQuantityType(.heartRate), predicate: range)],
+                                                 sortDescriptors: [SortDescriptor(\.startDate)])
+        return ((try? await descriptor.result(for: store)) ?? []).compactMap { sample in
+            let context = (sample.metadata?[HKMetadataKeyHeartRateMotionContext] as? NSNumber)?.intValue ?? 0
+            return context == 1 ? (sample.startDate, sample.quantity.doubleValue(for: perMinute)) : nil
+        }
+    }
+
     /// Un día inventado para el simulador: mañana tranquila, pico de estrés a mediodía, entreno a las 7.
     static func demo() -> (heartRate: [(date: Date, bpm: Double, sedentary: Bool)], hrv: [(date: Date, ms: Double)],
                            steps: [(date: Date, count: Double)]) {
@@ -171,15 +218,23 @@ final class StressModel: ObservableObject {
         let demo = ProcessInfo.processInfo.arguments.contains("-demo")
         let data = demo ? StressReader.demo() : await StressReader.read()
         let today = Calendar.current.startOfDay(for: .now)
+        // Tu pulso normal de día: quieto, fuera de entrenos y fuera del sueño, en las últimas 2 semanas.
+        let nights = health.days.compactMap(\.sleep)
+        let calmValues = demo ? [] : await StressReader.calmHistory(days: 14).filter { sample in
+            !training.workouts.contains { sample.date >= $0.start && sample.date <= $0.end }
+                && !nights.contains { sample.date >= $0.start && sample.date <= $0.end }
+        }.map(\.bpm)
+        let calm = StressEnergy.CalmPulse(calmValues)
         result = StressEnergy.compute(
             heartRate: data.heartRate, hrv: data.hrv, steps: data.steps,
             restingHR: health.baseline(\.restingHR)?.mean ?? 60, maximumHR: training.maximumHR,
-            baselineHRV: health.baseline(\.hrv)?.mean,
+            baselineHRV: health.baseline(\.hrv)?.mean, calm: calm,
             wake: health.today?.sleep?.end, recovery: health.todayRecovery?.score,
             workouts: training.workouts.filter { $0.end > today })
         // `-depurar`: imprime lo que entra en el cálculo, para revisarlo desde el Mac.
         if ProcessInfo.processInfo.arguments.contains("-depurar"), let r = result {
             let f = DateFormatter(); f.dateFormat = "HH:mm"
+            print("DEP calma", calm?.median as Any, "normal hasta", calm?.upperNormal as Any, "muestras", calmValues.count)
             print("DEP reposo", health.baseline(\.restingHR)?.mean as Any, "max", training.maximumHR,
                   "baseVFC", health.baseline(\.hrv)?.mean as Any, "despertar", health.today?.sleep?.end as Any,
                   "recuperacion", health.todayRecovery?.score as Any)

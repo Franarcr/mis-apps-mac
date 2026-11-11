@@ -60,6 +60,8 @@ enum NutritionLabelReader {
         var portion: Double?
         var ingredients: String?
         var isDrink = false
+        /// Las calorías no se pudieron leer bien y se calcularon con los macros.
+        var kcalFromMacros = false
     }
 
     private struct Line { let text: String; let box: CGRect }
@@ -112,7 +114,15 @@ enum NutritionLabelReader {
         }
 
         result.portion = portionGrams(in: norm)
-        let kcal = value(["calorias", "energia", "valor energetico", "calories"], excluding: ["de grasa", "kj"])
+        // Primero el número pegado a «kcal» («120kcal (502 kJ)»), sin contar el «2000 kcal» de la dieta de referencia;
+        // si no hay, el número junto a «calorías» o «energía».
+        let reference = ["dieta", "diet", "basad", "2000", "2.000", "valores diarios"]
+        let kcalWithUnit = norm.lazy.filter { l in !reference.contains { l.text.contains($0) } }
+            .compactMap { l -> Double? in
+                guard let m = l.text.firstMatch(of: /(\d+(?:[.,]\d+)?)\s*kcal/) else { return nil }
+                return Double(m.output.1.replacingOccurrences(of: ",", with: "."))
+            }.first
+        var kcal = kcalWithUnit ?? value(["calorias", "energia", "valor energetico", "calories"], excluding: ["de grasa", "kj"])
         let fat = value(["grasa total", "grasas totales", "total fat", "grasa"], excluding: ["saturad", "trans", "poli", "mono"])
         let saturated = value(["grasa saturada", "grasas saturadas", "saturada", "saturated"])
         let trans = value(["grasa trans", "grasas trans", "trans"])
@@ -121,6 +131,13 @@ enum NutritionLabelReader {
         let fiber = value(["fibra", "fiber"])
         let sugar = value(["azucares totales", "azucares", "azucar", "sugars"], excluding: ["anadid", "added"])
         let protein = value(["proteina", "protein"])
+
+        // Si las calorías leídas no cuadran para nada con los macros, se leyó otro número: se usan las de los macros.
+        let fromMacros = (protein ?? 0) * 4 + (carbs ?? 0) * 4 + (fat ?? 0) * 9
+        if fromMacros > 20, kcal.map({ abs($0 - fromMacros) > fromMacros * 0.5 }) ?? true {
+            kcal = fromMacros.rounded()
+            result.kcalFromMacros = true
+        }
 
         // Si la tabla trae una columna «por 100 g», ya está por 100; si no, se convierte desde la porción.
         let per100Column = norm.contains { $0.text.contains("100 g") || $0.text.contains("100g") || $0.text.contains("100 ml") || $0.text.contains("100ml") }

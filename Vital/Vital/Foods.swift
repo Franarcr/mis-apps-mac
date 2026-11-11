@@ -48,6 +48,23 @@ struct Food: Codable, Hashable, Identifiable {
     var additives: [String] = []
     var barcode: String? = nil
     var source: String = "tico"     // tico, código, etiqueta, propio
+    /// Las calorías de la foto no se leyeron bien y se calcularon con los macros (se avisa al revisar la etiqueta).
+    var kcalEstimated: Bool? = nil
+}
+
+extension Food {
+    /// Corrige las calorías de un producto leído de una foto cuando son imposibles para sus macros
+    /// (p. ej. 6 kcal en una porción con 6 g de grasa y 14 g de carbohidratos). Devuelve si cambió algo.
+    mutating func fixImpossibleKcal() -> Bool {
+        guard source != "tico" else { return false }
+        let n = per100
+        let fromMacros = n.protein * 4 + n.carbs * 4 + n.fat * 9
+        guard fromMacros > 40, n.kcal < fromMacros * 0.3 else { return false }
+        per100.kcal = fromMacros.rounded()
+        return true
+    }
+
+    var json: String { String(data: (try? JSONEncoder().encode(self)) ?? Data(), encoding: .utf8) ?? "{}" }
 }
 
 /// Comidas típicas de Costa Rica con valores aproximados por 100 g (referencias de la Tabla de Composición

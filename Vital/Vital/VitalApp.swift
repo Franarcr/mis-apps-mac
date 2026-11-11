@@ -41,6 +41,21 @@ struct VitalApp: App {
                 await bodyData.load()
                 // El último pesaje de la báscula es el peso corporal con el que se estiman las cargas.
                 if let weight = bodyData.latestWeight { UserDefaults.standard.set(weight, forKey: "pesoCorporal") }
+                // Entrenos de fuerza guardados sin calorías por versiones anteriores: se completan con lo que midió el reloj.
+                let repaired = await HealthWriter.repairStrengthWorkouts()
+                if ProcessInfo.processInfo.arguments.contains("-depurar") { repaired.forEach { print("ENTRENO", $0) } }
+                if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-inicio-entreno"),
+                   i + 1 < ProcessInfo.processInfo.arguments.count {
+                    let parts = ProcessInfo.processInfo.arguments[i + 1].split(separator: ":").compactMap { Int($0) }
+                    if parts.count >= 2, let start = Calendar.current.date(bySettingHour: parts[0], minute: parts[1],
+                                                                                second: parts.count > 2 ? parts[2] : 0, of: .now) {
+                        print("ENTRENO", await HealthWriter.fixTodayStart(start))
+                    }
+                }
+                if ProcessInfo.processInfo.arguments.contains("-traza-manana") {
+                    let day = Calendar.current.startOfDay(for: .now)
+                    for line in await HealthWriter.morningTrace(from: day.addingTimeInterval(4.5 * 3600), to: day.addingTimeInterval(7.5 * 3600)) { print("TRAZA", line) }
+                }
                 // El entreno usa tu pulso en reposo para calcular la carga.
                 await training.load(restingHR: model.baseline(\.restingHR)?.mean)
                 // Estrés y energía necesitan la recuperación, el pulso máximo y los entrenamientos de hoy.

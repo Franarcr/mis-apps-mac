@@ -8,9 +8,11 @@ import SwiftUI
 struct Recovery {
     let score: Int
 
-    static let baselineDays = 30
+    /// Tu base son los 21 días anteriores: con tus datos y los de Bevel es la que mejor coincide (con 30 la base
+    /// tardaba en seguir tus cambios y daba de 10 a 25 puntos menos que Bevel del 6 al 10 nov).
+    static let baselineDays = 21
     static let minimumBaseline = 7
-    static let sleepGoal: TimeInterval = 7.5 * 3600
+    static let sleepGoal: TimeInterval = 7 * 3600     // tu meta: 7 horas
 
     var signal: Signal { score >= 67 ? .good : score >= 34 ? .fair : .poor }
 
@@ -33,23 +35,28 @@ struct Recovery {
     /// `nil` si ese día no hay VFC o aún no hay suficientes días para tener una base.
     static func compute(for index: Int, in days: [DayData]) -> Recovery? {
         let day = days[index]
-        guard let hrv = day.hrv else { return nil }
+        guard let hrv = day.hrv, hrv > 0 else { return nil }
         let previous = Array(days[max(0, index - baselineDays)..<index])
-        let hrvBase = previous.compactMap(\.hrv)
+        let hrvBase = previous.compactMap(\.hrv).filter { $0 > 0 }
         guard hrvBase.count >= minimumBaseline else { return nil }
 
-        let (hrvMean, hrvSD) = stats(hrvBase)
-        // La VFC varía mucho de un día a otro: la desviación nunca se toma menor que el 5 % de la media.
-        // Pesos ajustados a Bevel con 8 días de tus datos (29 oct – 5 nov 2026; error medio ±4 puntos):
-        // la VFC es lo que más pesa, el pulso en reposo ayuda poco y dormir menos de la meta resta.
-        let raw = clamp((hrv - hrvMean) / max(hrvSD, hrvMean * 0.05), -2, 2)
-        var score = 55 + 31 * raw
-        if let resting = day.restingHR, let base = baseline(previous, \.restingHR) {
-            score -= 8 * clamp((resting - base.mean) / max(base.sd, 1), -2, 2)
+        // La VFC se compara en logaritmo (como en los estudios de Plews y Buchheit): sus valores no son simétricos
+        // (un día muy alto pesaría más que uno igual de bajo) y así la escala es relativa a tu propio nivel.
+        let (hrvMean, hrvSD) = stats(hrvBase.map(Foundation.log))
+        // La VFC varía mucho de un día a otro: la desviación nunca se toma menor que un 5 %.
+        // SOLO DATOS DE LA NOCHE: así la recuperación de la mañana no cambia en el día. El «pulso en reposo» de Apple
+        // no sirve: es una muestra por día que Apple reescribe hasta la noche (el 11 nov pasó a 72 tras caminar y
+        // hacer elíptica, y bajó la recuperación de 67 a 51). Se usa el pulso medio mientras dormías.
+        // Pesos ajustados (11 nov) a tus recuperaciones exactas de Bevel: 6 nov 60→60, 7 nov 57→56, 9 nov 70→70;
+        // el 10 nov Bevel dio 49 y Vital da 58 (no lo explica nada de la noche). Error medio ~2,6 puntos.
+        let raw = clamp((Foundation.log(hrv) - hrvMean) / max(hrvSD, 0.05), -2, 2)
+        var score = 58 + 14 * raw
+        if let sleeping = day.sleepingHR, let base = baseline(previous, \.sleepingHR) {
+            score -= 8 * clamp((sleeping - base.mean) / max(base.sd, 1), -2, 2)
         }
         if let sleep = day.sleep {
-            // Dormir menos de la meta resta (hasta 26 puntos sin dormir nada); dormir de más no suma.
-            score -= 26 * max(0, 1 - sleep.asleep / sleepGoal)
+            // Dormir menos de tu meta resta un poco (hasta 5 puntos sin dormir nada); dormir de más no suma.
+            score -= 5 * max(0, 1 - sleep.asleep / sleepGoal)
         }
         if let temp = day.wristTemperature, let mean = baseline(previous, \.wristTemperature)?.mean {
             // Solo la temperatura alta (posible fiebre o infección): desde +0,3 °C sobre tu base, hasta 15 puntos.
@@ -63,8 +70,8 @@ struct Recovery {
             score -= clamp((mean - oxygen - 1.5) * 4, 0, 10)
         }
         if index >= days.count - 8, ProcessInfo.processInfo.arguments.contains("-depurar") {
-            let rhrBase = baseline(previous, \.restingHR), tBase = baseline(previous, \.wristTemperature), rBase = baseline(previous, \.respiratoryRate)
-            print("RECUP \(day.day.formatted(.dateTime.day().month())) vfc \(hrv) base \(hrvMean)±\(hrvSD) n=\(hrvBase.count) | fcr \(day.restingHR ?? -1) base \(rhrBase?.mean ?? -1)±\(rhrBase?.sd ?? -1) | raw \(raw) | sueño \((day.sleep?.asleep ?? -1) / 3600) | temp \(day.wristTemperature ?? -1) base \(tBase?.mean ?? -1) | fr \(day.respiratoryRate ?? -1) base \(rBase?.mean ?? -1) | spo2 \(day.oxygen ?? -1) | final \(score)")
+            let rhrBase = baseline(previous, \.sleepingHR), tBase = baseline(previous, \.wristTemperature), rBase = baseline(previous, \.respiratoryRate)
+            print("RECUP \(day.day.formatted(.dateTime.day().month())) vfc \(hrv) base(ln) \(hrvMean)±\(hrvSD) n=\(hrvBase.count) | fc dormido \(day.sleepingHR ?? -1) base \(rhrBase?.mean ?? -1)±\(rhrBase?.sd ?? -1) | raw \(raw) | sueño \((day.sleep?.asleep ?? -1) / 3600) | temp \(day.wristTemperature ?? -1) base \(tBase?.mean ?? -1) | fr \(day.respiratoryRate ?? -1) base \(rBase?.mean ?? -1) | spo2 \(day.oxygen ?? -1) | final \(score)")
         }
         return Recovery(score: Int(clamp(score, 1, 99).rounded()))
     }
@@ -105,6 +112,8 @@ final class VitalModel: ObservableObject {
     var todayRecovery: Recovery? { today.flatMap { recoveries[$0.day] } }
     /// La de hoy calculada con los datos de este momento (cambia si el reloj sigue pasando medidas de la noche).
     @Published var liveRecovery: Recovery?
+    /// Hasta esta hora la de hoy es provisional (el reloj aún puede pasar datos de la noche); después queda fija.
+    @Published var provisionalUntil: Date?
     var daysWithHRV: Int { days.compactMap(\.hrv).count }
 
     /// Media y desviación de los 30 días anteriores a hoy, o `nil` si hay menos de 7 días con ese dato.
@@ -158,17 +167,21 @@ final class VitalModel: ObservableObject {
     /// Guarda la primera recuperación del día, una vez terminada la noche, y la devuelve desde entonces.
     /// `-fijar-recuperacion 60` (al abrirla desde el Mac) fija a mano la de hoy.
     private func fixedScore(for today: DayData, live: Int) -> Int {
-        let key = "recuperacionFijada"
+        // v2 (11 nov): con la fórmula de solo datos de la noche; la de antes guardó 51 por el pulso del día.
+        let key = "recuperacionFijada2"
         let day = ISO8601DateFormatter.dayFormatter.string(from: today.day)
         var saved = UserDefaults.standard.dictionary(forKey: key) as? [String: Int] ?? [:]
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-fijar-recuperacion"), i + 1 < args.count, let value = Int(args[i + 1]) {
             saved[day] = value
         }
-        if saved[day] == nil, let end = today.sleep?.end, end < .now { saved[day] = live }
+        // Se fija una hora después de despertar: antes, el reloj suele no haber pasado toda la noche
+        // (VFC, fases del sueño) y la recuperación saldría más baja de lo real.
+        if saved[day] == nil, let end = today.sleep?.end, end.addingTimeInterval(3600) < .now { saved[day] = live }
         // Solo se guardan las últimas semanas.
         saved = saved.filter { $0.key >= ISO8601DateFormatter.dayFormatter.string(from: .now.addingTimeInterval(-30 * 86400)) }
         UserDefaults.standard.set(saved, forKey: key)
+        provisionalUntil = saved[day] == nil ? today.sleep.map { $0.end.addingTimeInterval(3600) } : nil
         return saved[day] ?? live
     }
 
@@ -184,6 +197,9 @@ final class VitalModel: ObservableObject {
         var result: [Date: Recovery] = [:]
         for index in loaded.indices {
             if let recovery = Recovery.compute(for: index, in: loaded) { result[loaded[index].day] = recovery }
+        }
+        if ProcessInfo.processInfo.arguments.contains("-depurar") {
+            for d in loaded { print("DIA \(ISO8601DateFormatter.dayFormatter.string(from: d.day)) \(d.hrv ?? -1) \(d.restingHR ?? -1) \((d.sleep?.asleep ?? -3600) / 3600) \(d.sleepingHR ?? -1) \(d.wristTemperature ?? -1) \(d.respiratoryRate ?? -1) \(d.oxygen ?? -1)") }
         }
         liveRecovery = loaded.last.flatMap { result[$0.day] }
         if !demo, let today = loaded.last, let live = liveRecovery { result[today.day] = Recovery(score: fixedScore(for: today, live: live.score)) }

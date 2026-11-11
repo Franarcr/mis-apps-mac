@@ -88,8 +88,11 @@ final class SetLog {
     var reps: Int
     /// Número de serie dentro de la sesión (0, 1, 2…), para comparar cada una con su objetivo.
     var index: Int = 0
+    /// Cuándo marcaste la serie como hecha (para mostrarlas en el orden en que las hiciste).
+    var doneAt: Date? = nil
 
-    init(exerciseID: String, date: Date, session: UUID, weight: Double, reps: Int, index: Int) {
+    init(exerciseID: String, date: Date, session: UUID, weight: Double, reps: Int, index: Int, doneAt: Date? = nil) {
+        self.doneAt = doneAt
         self.exerciseID = exerciseID
         self.date = date
         self.session = session
@@ -194,17 +197,18 @@ enum LoadAdvisor {
             // Pirámide: todo sale de tu 1RM estimado, con 2 repeticiones en reserva en cada serie.
             var oneRM: Double
             if !lastSession.isEmpty {
-                oneRM = lastSession.map { epley($0.weight, $0.reps) }.max() ?? 0
-                let missed = zip(lastSession, targets).contains { $0.reps <= $1 - 2 }
+                // Tu máximo estimado sale de tu mejor serie de la última vez (peso y repeticiones juntos).
+                // No se castiga hacer menos repeticiones que el objetivo si fue con más peso:
+                // 36 kg × 10 cuando tocaban 12 rinde más que 32,5 kg × 12.
+                let best = lastSession.max { epley($0.weight, $0.reps) < epley($1.weight, $1.reps) }!
+                oneRM = epley(best.weight, best.reps)
                 let completed = lastSession.count >= targets.count && !zip(lastSession, targets).contains { $0.reps < $1 }
+                let bestText = "\(best.weight.formatted()) kg × \(best.reps)"
                 if completed {
                     oneRM *= 1.025
                     reason = "Completaste toda la pirámide: sube un poco en cada serie."
-                } else if missed {
-                    oneRM *= 0.95
-                    reason = "Alguna serie se quedó 2 o más repeticiones corta: baja un poco."
                 } else {
-                    reason = "Casi completa: mismo peso, busca todas las repeticiones."
+                    reason = "Calculado con tu mejor serie de la última vez (\(bestText)): máximo estimado \(Int(oneRM.rounded())) kg."
                 }
             } else if let estimated = estimatedOneRM(exercise, bodyWeight: bodyWeight, female: female, level: level) {
                 oneRM = estimated

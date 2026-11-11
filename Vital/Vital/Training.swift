@@ -17,16 +17,40 @@ struct Workout: Identifiable {
     var load: Double = 0
     /// Muestras de pulso durante el entrenamiento (vacío si el reloj no lo midió).
     var heartRate: [(date: Date, bpm: Double)] = []
+    /// En interiores (true), al aire libre (false) o sin dato (nil), como lo guardó el reloj.
+    var indoor: Bool?
+    /// Nombre propio que le puso la app que lo guardó (p. ej. la rutina en Bevel).
+    var title: String?
+    /// App que lo guardó, si no fue el Apple Watch.
+    var app: String?
 
     var duration: TimeInterval { end.timeIntervalSince(start) }
-    var name: String { Self.names[activity]?.0 ?? "Entrenamiento" }
-    var icon: String { Self.names[activity]?.1 ?? "figure.mixed.cardio" }
+    /// El nombre de la actividad como en la app Fitness: «Caminata en interiores», «Ciclismo al aire libre»…
+    var activityName: String {
+        let base = Self.names[activity]?.0 ?? "Entrenamiento"
+        guard Self.placed.contains(activity), let indoor else { return base }
+        return base + (indoor ? " en interiores" : " al aire libre")
+    }
+    /// Lo que se muestra: el nombre propio si lo hay (la rutina de Bevel); si no, la actividad.
+    var name: String { title ?? activityName }
+    /// Debajo del nombre propio: la actividad y la app («Fuerza tradicional · Bevel»).
+    var subtitle: String? {
+        let parts = [title == nil ? nil : activityName, app].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+    var icon: String {
+        if activity == .cycling, indoor == false { return "figure.outdoor.cycle" }
+        return Self.names[activity]?.1 ?? "figure.mixed.cardio"
+    }
+
+    /// Actividades en las que Fitness dice si fue en interiores o al aire libre.
+    private static let placed: Set<HKWorkoutActivityType> = [.walking, .running, .cycling]
 
     private static let names: [HKWorkoutActivityType: (String, String)] = [
-        .running: ("Correr", "figure.run"),
-        .walking: ("Caminar", "figure.walk"),
-        .cycling: ("Ciclismo", "figure.outdoor.cycle"),
-        .traditionalStrengthTraining: ("Fuerza", "figure.strengthtraining.traditional"),
+        .running: ("Carrera", "figure.run"),
+        .walking: ("Caminata", "figure.walk"),
+        .cycling: ("Ciclismo", "figure.indoor.cycle"),
+        .traditionalStrengthTraining: ("Fuerza tradicional", "figure.strengthtraining.traditional"),
         .functionalStrengthTraining: ("Fuerza funcional", "figure.strengthtraining.functional"),
         .highIntensityIntervalTraining: ("HIIT", "figure.highintensity.intervaltraining"),
         .swimming: ("Natación", "figure.pool.swim"),
@@ -37,8 +61,9 @@ struct Workout: Identifiable {
         .soccer: ("Fútbol", "figure.indoor.soccer"),
         .coreTraining: ("Core", "figure.core.training"),
         .mixedCardio: ("Cardio", "figure.mixed.cardio"),
-        .stairClimbing: ("Escaleras", "figure.stair.stepper"),
+        .stairClimbing: ("Escaladora", "figure.stair.stepper"),
         .socialDance: ("Baile", "figure.dance"),
+        .cardioDance: ("Baile cardio", "figure.dance"),
         .pilates: ("Pilates", "figure.pilates"),
         .cooldown: ("Enfriamiento", "figure.cooldown"),
         .flexibility: ("Estiramientos", "figure.flexibility"),
@@ -90,6 +115,10 @@ final class TrainingReader {
                 energy: w.statistics(for: energyType)?.sumQuantity()?.doubleValue(for: .kilocalorie()),
                 averageHR: hr?.averageQuantity()?.doubleValue(for: perMinute),
                 maximumHR: hr?.maximumQuantity()?.doubleValue(for: perMinute))
+            workout.indoor = w.metadata?[HKMetadataKeyIndoorWorkout] as? Bool
+            workout.title = (w.metadata?[HKMetadataKeyWorkoutBrandName] as? String)?.trimmingCharacters(in: .whitespaces).nilIfEmpty
+            let source = w.sourceRevision.source
+            if !source.bundleIdentifier.hasPrefix("com.apple") { workout.app = source.name }
             // El esfuerzo se guarda aparte, con la hora del entrenamiento.
             let matches: (HKQuantitySample) -> Bool = { $0.startDate >= w.startDate.addingTimeInterval(-60) && $0.startDate <= w.endDate.addingTimeInterval(3600) }
             workout.effort = (efforts.first(where: matches) ?? estimated.first(where: matches))
@@ -97,6 +126,14 @@ final class TrainingReader {
             let during = HKQuery.predicateForSamples(withStart: w.startDate, end: w.endDate)
             workout.heartRate = try await quantities(heartRateType, during)
                 .map { ($0.startDate, $0.quantity.doubleValue(for: perMinute)) }
+            // Entrenos guardados por apps (como Vital) sin pulso propio: el que midió el reloj en ese rato.
+            if workout.averageHR == nil, !workout.heartRate.isEmpty {
+                let bpm = workout.heartRate.map(\.bpm)
+                workout = Workout(id: workout.id, activity: workout.activity, start: workout.start, end: workout.end,
+                                  energy: workout.energy, averageHR: bpm.reduce(0, +) / Double(bpm.count), maximumHR: bpm.max(),
+                                  effort: workout.effort, load: workout.load, heartRate: workout.heartRate,
+                                  indoor: workout.indoor, title: workout.title, app: workout.app)
+            }
             list.append(workout)
         }
         return list
@@ -241,7 +278,9 @@ final class TrainingModel: ObservableObject {
 
     /// Carga de los últimos 7 días frente a la media semanal de las últimas 4 semanas.
     /// Entre 0,8 y 1,3 es la zona segura; por encima de 1,5 sube el riesgo de lesión.
+    /// Hacen falta al menos 3 semanas de entrenos registrados: con menos, el mes parece flojo y el número sale inflado.
     var loadRatio: (acute: Double, chronic: Double, ratio: Double)? {
+        guard let first = workouts.map(\.start).min(), first < calendar.date(byAdding: .day, value: -21, to: .now)! else { return nil }
         let days = dailyLoad(days: 28).map(\.load)
         let chronic = days.reduce(0, +) / 4
         guard chronic > 0 else { return nil }
@@ -285,4 +324,8 @@ final class TrainingModel: ObservableObject {
         heartRateRecovery = (0..<10).map { (calendar.date(byAdding: .day, value: -$0 * 4, to: now)!, 24 + Double($0 % 3)) }.reversed()
         loaded = true
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

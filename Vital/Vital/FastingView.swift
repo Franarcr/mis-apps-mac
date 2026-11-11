@@ -217,7 +217,7 @@ private struct EatLessSummary: View {
 
     var body: some View {
         let today = entries.filter { Calendar.current.isDateInToday($0.date) }.map(\.nutrients.kcal).reduce(0, +)
-        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, female: female, scale: readings.last?.values[.bmr])
+        let bmr = DailyTargets.basalRate(weight: weight, age: bodyData.age, height: bodyData.height, female: female, scale: readings.last?.values[.bmr])
         let challenge = EatLess.challenge(usual: EatLess.usualIntake(entries), bmr: bmr, female: female, percent: percent)
         let ratio = today / challenge
         Card {

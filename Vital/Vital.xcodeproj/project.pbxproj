@@ -1,127 +1,371 @@
 // !$*UTF8*$!
 {
 	archiveVersion = 1;
-	classes = {};
-	objectVersion = 77;
+	classes = {
+	};
+	objectVersion = 70;
 	objects = {
-		B1000000000000000000000A /* Vital */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Vital; sourceTree = "<group>"; };
-		B10000000000000000000020 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Shared; sourceTree = "<group>"; };
-		B10000000000000000000021 /* VitalWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; path = VitalWatch; sourceTree = "<group>"; };
-		B10000000000000000000030 /* FastingShared */ = {isa = PBXFileSystemSynchronizedRootGroup; path = FastingShared; sourceTree = "<group>"; };
-		B10000000000000000000031 /* VitalWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; path = VitalWidgets; sourceTree = "<group>"; };
-		B1000000000000000000000B = {isa = PBXGroup; children = (B1000000000000000000000A, B10000000000000000000020, B10000000000000000000021, B10000000000000000000030, B10000000000000000000031, B1000000000000000000000C); sourceTree = "<group>"; };
-		B1000000000000000000000C /* Products */ = {isa = PBXGroup; children = (B1000000000000000000000D, B10000000000000000000022, B10000000000000000000032); name = Products; sourceTree = "<group>"; };
+
+/* Begin PBXBuildFile section */
+		B10000000000000000000025 /* VitalWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* VitalWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B10000000000000000000036 /* VitalWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* VitalWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B10000000000000000000027 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B10000000000000000000011 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B10000000000000000000028;
+			remoteInfo = VitalWatch;
+		};
+		B10000000000000000000038 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B10000000000000000000011 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B1000000000000000000003A;
+			remoteInfo = VitalWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B10000000000000000000026 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				B10000000000000000000025 /* VitalWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000037 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B10000000000000000000036 /* VitalWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
 		B1000000000000000000000D /* Vital.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vital.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000022 /* VitalWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VitalWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000032 /* VitalWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VitalWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		B10000000000000000000033 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000034 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000036 /* VitalWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		B10000000000000000000037 /* Embed Foundation Extensions */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 13; files = (B10000000000000000000036); name = "Embed Foundation Extensions"; runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000038 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = B10000000000000000000011; proxyType = 1; remoteGlobalIDString = B1000000000000000000003A; remoteInfo = VitalWidgets; };
-		B10000000000000000000039 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = B1000000000000000000003A; targetProxy = B10000000000000000000038; };
-		B1000000000000000000003A /* VitalWidgets */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B1000000000000000000003B;
-			buildPhases = (B10000000000000000000033, B10000000000000000000034);
-			buildRules = ();
-			dependencies = ();
-			fileSystemSynchronizedGroups = (B10000000000000000000030, B10000000000000000000031);
-			name = VitalWidgets;
-			productName = VitalWidgets;
-			productReference = B10000000000000000000032;
-			productType = "com.apple.product-type.app-extension";
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B1000000000000000000000A /* Vital */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Vital; sourceTree = "<group>"; };
+		B10000000000000000000020 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Shared; sourceTree = "<group>"; };
+		B10000000000000000000021 /* VitalWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = VitalWatch; sourceTree = "<group>"; };
+		B10000000000000000000030 /* FastingShared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = FastingShared; sourceTree = "<group>"; };
+		B10000000000000000000031 /* VitalWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = VitalWidgets; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXGroup section */
+		B1000000000000000000000B = {
+			isa = PBXGroup;
+			children = (
+				B1000000000000000000000A /* Vital */,
+				B10000000000000000000020 /* Shared */,
+				B10000000000000000000021 /* VitalWatch */,
+				B10000000000000000000030 /* FastingShared */,
+				B10000000000000000000031 /* VitalWidgets */,
+				B1000000000000000000000C /* Products */,
+			);
+			sourceTree = "<group>";
 		};
-		B1000000000000000000003C /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			SKIP_INSTALL = YES; APPLICATION_EXTENSION_API_ONLY = YES;
-			CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = CQNAH77456;
-			CODE_SIGN_ENTITLEMENTS = VitalWidgets.entitlements;
-			GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = "VitalWidgets-Info.plist";
-			INFOPLIST_KEY_CFBundleDisplayName = Vital;
-			LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-			SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG WIDGET_EXTENSION";
-			PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital.widgets; PRODUCT_NAME = "$(TARGET_NAME)";
-			TARGETED_DEVICE_FAMILY = 1; MARKETING_VERSION = 0.1; CURRENT_PROJECT_VERSION = 1;
-		}; name = Debug; };
-		B1000000000000000000003B = {isa = XCConfigurationList; buildConfigurations = (B1000000000000000000003C); defaultConfigurationName = Debug; };
-		B10000000000000000000023 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000024 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000025 /* VitalWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		B10000000000000000000026 /* Embed Watch Content */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = "$(CONTENTS_FOLDER_PATH)/Watch"; dstSubfolderSpec = 16; files = (B10000000000000000000025); name = "Embed Watch Content"; runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000027 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = B10000000000000000000011; proxyType = 1; remoteGlobalIDString = B10000000000000000000028; remoteInfo = VitalWatch; };
-		B10000000000000000000029 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = B10000000000000000000028; targetProxy = B10000000000000000000027; };
-		B10000000000000000000028 /* VitalWatch */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B1000000000000000000002A;
-			buildPhases = (B10000000000000000000023, B10000000000000000000024);
-			buildRules = ();
-			dependencies = ();
-			fileSystemSynchronizedGroups = (B10000000000000000000020, B10000000000000000000021);
-			name = VitalWatch;
-			productName = VitalWatch;
-			productReference = B10000000000000000000022;
-			productType = "com.apple.product-type.application";
+		B1000000000000000000000C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B1000000000000000000000D /* Vital.app */,
+				B10000000000000000000022 /* VitalWatch.app */,
+				B10000000000000000000032 /* VitalWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
 		};
-		B1000000000000000000002B /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			SDKROOT = watchos; WATCHOS_DEPLOYMENT_TARGET = 11.0; SKIP_INSTALL = YES;
-			CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = CQNAH77456;
-			CODE_SIGN_ENTITLEMENTS = VitalWatch.entitlements;
-			GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = "VitalWatch-Info.plist";
-			ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-			INFOPLIST_KEY_CFBundleDisplayName = Vital;
-			INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.francho.vital;
-			INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
-			INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tu pulso y calorías durante el entreno.";
-			INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Vital guarda en Salud los entrenos de tus rutinas.";
-			PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital.watchkitapp; PRODUCT_NAME = "$(TARGET_NAME)";
-			TARGETED_DEVICE_FAMILY = 4; MARKETING_VERSION = 0.1; CURRENT_PROJECT_VERSION = 1;
-		}; name = Debug; };
-		B1000000000000000000002A = {isa = XCConfigurationList; buildConfigurations = (B1000000000000000000002B); defaultConfigurationName = Debug; };
-		B1000000000000000000000E /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		B10000000000000000000015 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
 		B1000000000000000000000F /* Vital */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B10000000000000000000010;
-			buildPhases = (B1000000000000000000000E, B10000000000000000000015, B10000000000000000000026, B10000000000000000000037);
-			buildRules = ();
-			dependencies = (B10000000000000000000029, B10000000000000000000039);
-			fileSystemSynchronizedGroups = (B1000000000000000000000A, B10000000000000000000020, B10000000000000000000030);
+			buildConfigurationList = B10000000000000000000010 /* Build configuration list for PBXNativeTarget "Vital" */;
+			buildPhases = (
+				B1000000000000000000000E /* Sources */,
+				B10000000000000000000015 /* Resources */,
+				B10000000000000000000026 /* Embed Watch Content */,
+				B10000000000000000000037 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B10000000000000000000029 /* PBXTargetDependency */,
+				B10000000000000000000039 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B1000000000000000000000A /* Vital */,
+				B10000000000000000000020 /* Shared */,
+				B10000000000000000000030 /* FastingShared */,
+			);
 			name = Vital;
 			productName = Vital;
-			productReference = B1000000000000000000000D;
+			productReference = B1000000000000000000000D /* Vital.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B10000000000000000000028 /* VitalWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000000000000000000002A /* Build configuration list for PBXNativeTarget "VitalWatch" */;
+			buildPhases = (
+				B10000000000000000000023 /* Sources */,
+				B10000000000000000000024 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B10000000000000000000020 /* Shared */,
+				B10000000000000000000021 /* VitalWatch */,
+			);
+			name = VitalWatch;
+			productName = VitalWatch;
+			productReference = B10000000000000000000022 /* VitalWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B1000000000000000000003A /* VitalWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000000000000000000003B /* Build configuration list for PBXNativeTarget "VitalWidgets" */;
+			buildPhases = (
+				B10000000000000000000033 /* Sources */,
+				B10000000000000000000034 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B10000000000000000000030 /* FastingShared */,
+				B10000000000000000000031 /* VitalWidgets */,
+			);
+			name = VitalWidgets;
+			productName = VitalWidgets;
+			productReference = B10000000000000000000032 /* VitalWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
 		B10000000000000000000011 /* Project object */ = {
 			isa = PBXProject;
-			buildConfigurationList = B10000000000000000000012;
+			attributes = {
+			};
+			buildConfigurationList = B10000000000000000000012 /* Build configuration list for PBXProject "Vital" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = es;
-			knownRegions = (es, Base);
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				es,
+				Base,
+			);
 			mainGroup = B1000000000000000000000B;
-			productRefGroup = B1000000000000000000000C;
+			productRefGroup = B1000000000000000000000C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (B1000000000000000000000F, B10000000000000000000028, B1000000000000000000003A);
+			targets = (
+				B1000000000000000000000F /* Vital */,
+				B10000000000000000000028 /* VitalWatch */,
+				B1000000000000000000003A /* VitalWidgets */,
+			);
 		};
-		B10000000000000000000013 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 18.0; SWIFT_VERSION = 5.0; ALWAYS_SEARCH_USER_PATHS = NO;
-		}; name = Debug; };
-		B10000000000000000000014 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = CQNAH77456;
-			CODE_SIGN_ENTITLEMENTS = Vital.entitlements;
-			GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-			ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-			INFOPLIST_KEY_CFBundleDisplayName = Vital;
-			INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tus datos del reloj (sueño, pulso, VFC, entrenamientos) y tu peso para calcular recuperación, carga y pesos de tus rutinas. Nada sale de tu iPhone.";
-			INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Vital guarda en Salud lo que comes (calorías y nutrientes) y los entrenos de tus rutinas.";
-			INFOPLIST_KEY_NSCameraUsageDescription = "Vital usa la cámara para escanear códigos de barras y fotografiar etiquetas nutricionales.";
-			INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-			INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-			PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital; PRODUCT_NAME = "$(TARGET_NAME)";
-			TARGETED_DEVICE_FAMILY = 1; MARKETING_VERSION = 0.1; CURRENT_PROJECT_VERSION = 1;
-		}; name = Debug; };
-		B10000000000000000000010 = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000014); defaultConfigurationName = Debug; };
-		B10000000000000000000012 = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000013); defaultConfigurationName = Debug; };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B10000000000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000024 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000034 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B1000000000000000000000E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000023 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000033 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B10000000000000000000029 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B10000000000000000000028 /* VitalWatch */;
+			targetProxy = B10000000000000000000027 /* PBXContainerItemProxy */;
+		};
+		B10000000000000000000039 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B1000000000000000000003A /* VitalWidgets */;
+			targetProxy = B10000000000000000000038 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B10000000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B10000000000000000000014 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vital.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CQNAH77456;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Vital;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Vital usa la cámara para escanear códigos de barras y fotografiar etiquetas nutricionales.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tus datos del reloj (sueño, pulso, VFC, entrenamientos) y tu peso para calcular recuperación, carga y pesos de tus rutinas. Nada sale de tu iPhone.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Vital guarda en Salud lo que comes (calorías y nutrientes) y los entrenos de tus rutinas.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		B1000000000000000000002B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = VitalWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CQNAH77456;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "VitalWatch-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Vital;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Vital lee tu pulso y calorías durante el entreno.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Vital guarda en Salud los entrenos de tus rutinas.";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.francho.vital;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		B1000000000000000000003C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = VitalWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CQNAH77456;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "VitalWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Vital;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.francho.vital.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG WIDGET_EXTENSION";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B10000000000000000000010 /* Build configuration list for PBXNativeTarget "Vital" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000014 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B10000000000000000000012 /* Build configuration list for PBXProject "Vital" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000013 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B1000000000000000000002A /* Build configuration list for PBXNativeTarget "VitalWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1000000000000000000002B /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B1000000000000000000003B /* Build configuration list for PBXNativeTarget "VitalWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1000000000000000000003C /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
 	};
-	rootObject = B10000000000000000000011;
+	rootObject = B10000000000000000000011 /* Project object */;
 }
