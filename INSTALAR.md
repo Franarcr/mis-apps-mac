@@ -13,6 +13,7 @@ Hay once apps. Instala las que quieras:
 | **Compresor** | Abrir, extraer y crear archivos comprimidos (ZIP, 7z, RAR, TAR…) | macOS 14 o posterior |
 | **Lazo** | Colocar ventanas en la cuadrícula de cada monitor con ⌥⇧L, como Lasso | macOS 14 o posterior |
 | **Batido** | Escribir páginas web y verlas al momento mientras escribes | macOS 14 o posterior |
+| **Antena** | Ver las redes Wi-Fi cercanas, sus canales y su señal, para elegir el mejor canal | macOS 14 o posterior |
 | **Grabador** | Grabar imágenes de sistemas en USB y tarjetas SD para que arranquen, como balenaEtcher | macOS 14 o posterior |
 | **Revela** | Editar fotos (también RAW) con looks y la IA de macOS, como Luminar | macOS 14 o posterior |
 | **Barra** | Juntar en un solo icono las demás apps: las que desmarques esconden su icono pero siguen funcionando | macOS 14 o posterior |
@@ -38,7 +39,7 @@ Solo hay que hacerlo una vez por app.
 
 ## 3. Dar los permisos
 
-Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen y Barra viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas, Compresor, Lazo, Grabador, Revela y Batido sí aparecen en el Dock, como cualquier app con ventanas.
+Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen y Barra viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas, Compresor, Lazo, Grabador, Revela, Batido y Antena sí aparecen en el Dock, como cualquier app con ventanas.
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.

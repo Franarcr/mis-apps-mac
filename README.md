@@ -1,6 +1,6 @@
 # Mis apps para Mac
 
-Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Command Line Tools). Casi todas viven en la barra de menú; Historietas, Compresor, Lazo, Grabador, Revela y Batido tienen ventana y viven en el Dock.
+Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Command Line Tools). Casi todas viven en la barra de menú; Historietas, Compresor, Lazo, Grabador, Revela, Batido y Antena tienen ventana y viven en el Dock.
 
 | App | Qué hace | macOS |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 | [Compresor](Compresor/) | Abrir, extraer y crear comprimidos (ZIP con AES-256, 7z, RAR 4/5, TAR…), con Servicios del Finder, al estilo de WinZip | 14+ |
 | [Lazo](Lazo/) | Colocar ventanas con la cuadrícula de cada monitor (⌥⇧L sobre la ventana), zonas con atajo y arrastre con ⌃⌥, al estilo de Lasso | 14+ |
 | [Batido](Batido/) | Editor de páginas web (HTML, CSS, JavaScript y PHP) con vista previa en vivo, fragmentos y revisión de errores | 14+ |
+| [Antena](Antena/) | Analizador de redes Wi-Fi: señal, canales, seguridad, generación y fabricante (registro del IEEE), con gráficos y avisos | 14+ |
 | [Grabador](Grabador/) | Grabar imágenes de sistemas (.img, .iso, .zip, .xz…) en USB y tarjetas SD con verificación, al estilo de balenaEtcher | 14+ |
 | [Revela](Revela/) | Editor de fotos (también RAW) con ajustes, looks, LUT .cube y la IA de macOS: desenfocar fondo, luz del sujeto, enderezar horizonte. Inspirado en Luminar | 14+ |
 | [Barra](Barra/) | Junta en un solo icono las demás apps: las desmarcadas esconden su icono y siguen funcionando | 14+ |
