@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ("com.fran.compresor", "Compresor"),
         ("com.fran.lazo", "Lazo"),
         ("com.fran.grabador", "Grabador"),
+        ("com.fran.batido", "Batido"),
     ]
     private static let setHiddenNotification = Notification.Name("com.fran.barra.setHidden")
     private static let showMenuNotification = Notification.Name("com.fran.barra.showMenu")
