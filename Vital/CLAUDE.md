@@ -53,4 +53,6 @@ Lee esto entero antes de tocar recuperación, energía, estrés o entreno.
   (imprime `DIA`, `RECUP`, `DEP`, `FCR`, `ENTRENO`; el iPhone debe estar desbloqueado).
   Otros: `-fijar-recuperacion N`, `-traza-manana`, `-inicio-entreno HH:MM:SS`.
 - Datos del iPhone: `xcrun devicectl device copy from --device 00008110-00011CE23C33801E --domain-type appGroupDataContainer --domain-identifier group.com.francho.vital --source "Library/Application Support" --destination <carpeta>`
-- La firma (equipo personal CQNAH77456) caduca cada 7 días: hay que reinstalar.
+- La firma (equipo personal CQNAH77456) caduca cada 7 días: hay que reinstalar. Ojo: Xcode reutiliza el perfil
+  viejo y la fecha no cambia; antes de compilar, aparta los perfiles `com.francho.vital*` de
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles` y comprueba la fecha en `embedded.mobileprovision`.
