@@ -10,10 +10,12 @@ Apps para macOS con chip Apple, escritas en Swift sin Xcode (solo con las Comman
 | [Monitor](Monitor/) | Widget de escritorio con CPU, memoria, GPU, temperatura, consumo, red, disco, batería y procesos en tiempo real | 14+ |
 | [Ventanas](Ventanas/) | El botón verde agranda la ventana sin pantalla completa, y el rojo cierra del todo las apps que elijas | 14+ |
 | [Volumen](Volumen/) | Volumen de cada app por separado, de silencio a 150 % | 14.2+ |
+| [Oído](Oido/) | Graba las llamadas de WhatsApp, Teams y Meet, las pasa a texto en la Mac y hace un resumen con pendientes | 14.2+ (resumen: 26+) |
 | [Compresor](Compresor/) | Abrir, extraer y crear comprimidos (ZIP con AES-256, 7z, RAR 4/5, TAR…), con Servicios del Finder, al estilo de WinZip | 14+ |
 | [Lazo](Lazo/) | Colocar ventanas con la cuadrícula de cada monitor (⌥⇧L sobre la ventana), zonas con atajo y arrastre con ⌃⌥, al estilo de Lasso | 14+ |
 | [Batido](Batido/) | Editor de páginas web (HTML, CSS, JavaScript y PHP) con vista previa en vivo, fragmentos y revisión de errores | 14+ |
 | [Antena](Antena/) | Analizador de redes Wi-Fi: señal, canales, seguridad, generación y fabricante (registro del IEEE), con gráficos y avisos | 14+ |
+| [Vitrina](Vitrina/) | Instalador de todas estas apps: las lista con su estado y las instala en otro Mac. `./build.sh --dmg` crea `dist/Vitrina.dmg` | 14+ |
 | [Grabador](Grabador/) | Grabar imágenes de sistemas (.img, .iso, .zip, .xz…) en USB y tarjetas SD con verificación, al estilo de balenaEtcher | 14+ |
 | [Revela](Revela/) | Editor de fotos (también RAW) con ajustes, looks, LUT .cube y la IA de macOS: desenfocar fondo, luz del sujeto, enderezar horizonte. Inspirado en Luminar | 14+ |
 | [Barra](Barra/) | Junta en un solo icono las demás apps: las desmarcadas esconden su icono y siguen funcionando | 14+ |

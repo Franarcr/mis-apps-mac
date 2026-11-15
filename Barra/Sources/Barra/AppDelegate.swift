@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ("com.fran.monitor", "Monitor"),
         ("com.fran.ventanas", "Ventanas"),
         ("com.fran.volumen", "Volumen"),
+        ("com.fran.oido", "Oído"),
         ("com.fran.barrendero", "Barrendero"),
         ("com.fran.guardian", "Guardián"),
     ]
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ("com.fran.batido", "Batido"),
         ("com.fran.antena", "Antena"),
         ("com.fran.lienzo", "Lienzo"),
+        ("com.fran.vitrina", "Vitrina"),
     ]
     private static let setHiddenNotification = Notification.Name("com.fran.barra.setHidden")
     private static let showMenuNotification = Notification.Name("com.fran.barra.showMenu")

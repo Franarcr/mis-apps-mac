@@ -1,5 +1,11 @@
 # Cómo instalar las apps
 
+## La forma fácil: Vitrina
+
+Abre `Vitrina.dmg` y arrastra **Vitrina** a **Aplicaciones**. La primera vez macOS la bloquea: ábrela, ve a **Ajustes del Sistema › Privacidad y seguridad** y pulsa **Abrir igualmente** (ver el paso 2 más abajo). Luego marca las apps que quieras y pulsa **Instalar seleccionadas**. Vitrina las copia ya desbloqueadas y, al terminar, te dice qué permisos necesita cada una.
+
+## Una por una
+
 Hay once apps. Instala las que quieras:
 
 | App | Para qué sirve | Necesita |
@@ -10,6 +16,7 @@ Hay once apps. Instala las que quieras:
 | **Monitor** | Widgets en el escritorio: uno con CPU, memoria, red y disco, y otro con la batería del Mac y de tus accesorios (teclado, ratón, AirPods…) | macOS 14 o posterior |
 | **Ventanas** | El botón verde agranda la ventana sin pasar a pantalla completa, y el rojo cierra del todo las apps que elijas | macOS 14 o posterior |
 | **Volumen** | Cambiar el volumen de cada app por separado (bajar la música sin bajar una llamada) | macOS 14.2 o posterior |
+| **Oído** | Grabar las llamadas de WhatsApp, Teams y Meet, pasarlas a texto y resumirlas | macOS 14.2 o posterior (el resumen, macOS 26 con Apple Intelligence) |
 | **Compresor** | Abrir, extraer y crear archivos comprimidos (ZIP, 7z, RAR, TAR…) | macOS 14 o posterior |
 | **Lazo** | Colocar ventanas en la cuadrícula de cada monitor con ⌥⇧L, como Lasso | macOS 14 o posterior |
 | **Batido** | Escribir páginas web y verlas al momento mientras escribes | macOS 14 o posterior |
@@ -39,11 +46,12 @@ Solo hay que hacerlo una vez por app.
 
 ## 3. Dar los permisos
 
-Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen y Barra viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas, Compresor, Lazo, Grabador, Revela, Batido y Antena sí aparecen en el Dock, como cualquier app con ventanas.
+Captura, Portapapeles, Puntos, Monitor, Ventanas, Volumen, Oído y Barra viven en la **barra de menú** (arriba a la derecha) y no en el Dock. Historietas, Compresor, Lazo, Grabador, Revela, Batido y Antena sí aparecen en el Dock, como cualquier app con ventanas.
 
 - **Captura:** la primera vez que hagas una captura, pedirá permiso de **Grabación de pantalla**. Actívalo en Ajustes, sal de Captura desde su icono y vuelve a abrirla. Si quieres grabar tu voz en los vídeos, actívalo en el menú › *Audio de los vídeos › Micrófono*.
 - **Portapapeles:** para que *Enter* pegue directamente, en su menú elige *Activar pegado automático…* y concede **Accesibilidad**. Si macOS pregunta si puede leer lo que copias, elige **Permitir siempre**.
 - **Ventanas:** pide permiso de **Accesibilidad** para mover y cerrar las ventanas de otras apps. Actívalo en Ajustes; no hace falta reiniciarla. El botón rojo cierra la app en todas las apps; desde su menú puedes elegir solo algunas.
+- **Oído:** la primera vez que grabe pedirá permiso de **Micrófono** y de **audio del sistema**. La primera transcripción tarda un poco más porque macOS descarga el español. Avisa siempre a la otra persona de que la llamada se graba.
 - **Volumen:** la primera vez que cambies un volumen, pedirá permiso para **grabar el audio del sistema** (lo necesita para cambiar el volumen; no graba nada). Si no lo das, esa app queda en silencio hasta que la vuelvas al 100 %.
 - **Lazo:** al abrirla pedirá el permiso de **Accesibilidad** (para mover las ventanas de otras apps). Actívalo en Ajustes y Lazo se pondrá en marcha sola.
 - **Compresor:** sus opciones aparecen en el clic derecho del Finder (*Comprimir con Compresor*, *Extraer aquí con Compresor*). Si no salen, búscalas en el submenú *Servicios*.

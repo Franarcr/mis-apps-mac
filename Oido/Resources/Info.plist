@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Oido</string>
+    <key>CFBundleDisplayName</key>
+    <string>Oído</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.fran.oido</string>
+    <key>CFBundleExecutable</key>
+    <string>Oido</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>es</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.2</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Oído graba el sonido de la llamada (lo que dice la otra persona) para guardarlo y pasarlo a texto en esta Mac.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Oído graba tu voz durante las llamadas que decidas guardar.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Oído pasa las llamadas a texto en esta Mac, sin enviarlas a internet.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
