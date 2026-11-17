@@ -37,8 +37,13 @@ first=1
 for app in "${APPS[@]}"; do
   src="/Applications/$app.app"
   # Las apps de Elena se pueden tomar ya compiladas en su repo, sin instalarlas en este Mac.
-  if [ ! -d "$src" ] && [ "$app" = "Suite Notarial" ]; then src="$HOME/Documents/GitHub/suite-notarial/$app.app"; fi
-  if [ ! -d "$src" ] && [ "$app" = "MacCleaner" ]; then src="$HOME/Documents/GitHub/mac-cleaner/$app.app"; fi
+  if [ ! -d "$src" ] && [ "$app" = "Suite Notarial" ]; then src="$HOME/Documents/IA/Claude/Elena/suite-notarial/$app.app"; fi
+  if [ ! -d "$src" ] && [ "$app" = "MacCleaner" ]; then src="$HOME/Documents/IA/Claude/Elena/mac-cleaner/$app.app"; fi
+  # Las de este repositorio que no estén instaladas se compilan aparte, sin tocar /Applications.
+  if [ ! -d "$src" ] && grep -q INSTALL_DIR "../$app/build.sh" 2>/dev/null; then
+    echo "   (compilando $app para el DMG)"
+    (cd "../$app" && INSTALL_DIR="$STAGE/built" ./build.sh >/dev/null 2>&1) && src="$STAGE/built/$app.app"
+  fi
   if [ ! -d "$src" ]; then echo "   (sin $app: no está instalada en este Mac)"; continue; fi
   # La copia del repo vive en Documentos (iCloud le agrega atributos): se limpia y se firma aparte.
   if [[ "$src" != /Applications/* ]]; then

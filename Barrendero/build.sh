@@ -39,6 +39,8 @@ else
 fi
 
 # Solo se instala en /Applications para que no aparezcan copias repetidas en el Launchpad.
-rm -rf "/Applications/$NAME.app"
-ditto --norsrc --noextattr "$APP" "/Applications/$NAME.app"
-echo "Instalado en /Applications/$NAME.app"
+DEST="${INSTALL_DIR:-/Applications}"   # INSTALL_DIR: otra carpeta (la usa Vitrina para el DMG)
+mkdir -p "$DEST"
+rm -rf "$DEST/$NAME.app"
+ditto --norsrc --noextattr "$APP" "$DEST/$NAME.app"
+echo "Instalado en $DEST/$NAME.app"
