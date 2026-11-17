@@ -72,9 +72,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for app in apps {
             let entry = item(app.name, #selector(toggleIcon(_:)))
             entry.representedObject = app.id
-            entry.state = isHidden(app.id) ? .off : .on
+            let running = isRunning(app.id)
+            entry.state = running && !isHidden(app.id) ? .on : .off
             entry.image = smallIcon(app.url)
-            entry.toolTip = "Desmarcada: el icono se esconde, pero la app sigue funcionando."
+            if !running {
+                entry.title = app.name + " (cerrada)"
+                entry.toolTip = "Está cerrada: tócala para abrirla."
+            } else {
+                entry.toolTip = "Desmarcada: el icono se esconde, pero la app sigue funcionando."
+            }
             menu.addItem(entry)
         }
 
@@ -132,6 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleIcon(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
+        // Si está cerrada, se abre con el icono a la vista.
+        if !isRunning(id), let app = installed.first(where: { $0.id == id }) {
+            UserDefaults(suiteName: id)?.set(false, forKey: "iconHidden")
+            NSWorkspace.shared.openApplication(at: app.url, configuration: NSWorkspace.OpenConfiguration(),
+                                               completionHandler: nil)
+            return
+        }
         let hidden = !isHidden(id)
         // Se guarda en sus preferencias (vale aunque la app esté cerrada) y se le avisa si está abierta.
         UserDefaults(suiteName: id)?.set(hidden, forKey: "iconHidden")
