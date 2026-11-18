@@ -55,7 +55,7 @@ enum HealthWriter {
 
     // MARK: Entrenos
 
-    enum WorkoutResult { case saved(Double?), watchHadIt, failed }
+    enum WorkoutResult { case saved(Double?, estimated: Bool), watchHadIt, failed }
 
     private static let energyType = HKQuantityType(.activeEnergyBurned)
     /// Entrenos del reloj que pueden ser la misma sesión de pesas.
@@ -85,9 +85,68 @@ enum HealthWriter {
         return total > 0 ? total : nil
     }
 
+    // MARK: Calorías con tu pulso
+
+    /// Tu relación pulso → kcal activas por minuto, sacada de los entrenos que grabó tu reloj
+    /// (recta de mínimos cuadrados entre el pulso medio y las kcal por minuto de cada entreno).
+    struct HeartRateCalibration { let a: Double; let b: Double; let workouts: Int; let maxHR: Double
+        func perMinute(_ hr: Double) -> Double { max(0, a + b * min(hr, maxHR)) }
+    }
+
+    static func heartRateCalibration(days: Int = 120) async -> HeartRateCalibration? {
+        let from = Calendar.current.date(byAdding: .day, value: -days, to: .now)!
+        let range = HKQuery.predicateForSamples(withStart: from, end: .now)
+        let workouts = (try? await HKSampleQueryDescriptor(predicates: [.workout(range)], sortDescriptors: []).result(for: store)) ?? []
+        let own = Bundle.main.bundleIdentifier
+        let bpm = HKUnit.count().unitDivided(by: .minute())
+        let points: [(hr: Double, perMin: Double)] = workouts.compactMap { w in
+            guard w.sourceRevision.source.bundleIdentifier != own, w.duration >= 5 * 60,
+                  let hr = w.statistics(for: HKQuantityType(.heartRate))?.averageQuantity()?.doubleValue(for: bpm),
+                  let kcal = w.statistics(for: energyType)?.sumQuantity()?.doubleValue(for: .kilocalorie()), kcal > 0
+            else { return nil }
+            return (hr, kcal / (w.duration / 60))
+        }
+        guard points.count >= 3 else { return nil }
+        let n = Double(points.count)
+        let mx = points.map(\.hr).reduce(0, +) / n, my = points.map(\.perMin).reduce(0, +) / n
+        let sxx = points.reduce(0) { $0 + ($1.hr - mx) * ($1.hr - mx) }
+        guard sxx > 0 else { return nil }
+        let b = points.reduce(0) { $0 + ($1.hr - mx) * ($1.perMin - my) } / sxx
+        guard b > 0 else { return nil }
+        return HeartRateCalibration(a: my - b * mx, b: b, workouts: points.count, maxHR: points.map(\.hr).max() ?? 200)
+    }
+
+    /// Kcal activas calculadas con el pulso que midió tu reloj en ese rato. Cada medida de pulso
+    /// vale hasta la mitad del camino a la siguiente. Hace falta al menos una medida cada 5 minutos.
+    static func heartRateEnergy(from start: Date, to end: Date, calibration c: HeartRateCalibration) async -> Double? {
+        let range = HKQuery.predicateForSamples(withStart: start, end: end)
+        let samples = ((try? await HKSampleQueryDescriptor(predicates: [.quantitySample(type: HKQuantityType(.heartRate), predicate: range)],
+                                                          sortDescriptors: [SortDescriptor(\.startDate)]).result(for: store)) ?? [])
+        let minutes = end.timeIntervalSince(start) / 60
+        guard samples.count >= max(2, Int(minutes / 5)) else { return nil }
+        let bpm = HKUnit.count().unitDivided(by: .minute())
+        var total = 0.0
+        for (i, s) in samples.enumerated() {
+            let from = i == 0 ? start : Date(timeIntervalSince1970: (samples[i - 1].startDate.timeIntervalSince1970 + s.startDate.timeIntervalSince1970) / 2)
+            let to = i == samples.count - 1 ? end : Date(timeIntervalSince1970: (s.startDate.timeIntervalSince1970 + samples[i + 1].startDate.timeIntervalSince1970) / 2)
+            total += c.perMinute(s.quantity.doubleValue(for: bpm)) * max(0, to.timeIntervalSince(from)) / 60
+        }
+        return total
+    }
+
+    /// Las kcal de una sesión sin entreno en el reloj: lo que el reloj anotó, o lo calculado con tu pulso
+    /// si es más (sin entreno iniciado el reloj apenas anota calorías). `estimated` dice cuál se usó.
+    static func sessionEnergy(from start: Date, to end: Date) async -> (kcal: Double?, estimated: Bool) {
+        let measured = await watchActiveEnergy(from: start, to: end)
+        guard let c = await heartRateCalibration(),
+              let fromPulse = await heartRateEnergy(from: start, to: end, calibration: c),
+              fromPulse > (measured ?? 0) else { return (measured, false) }
+        return (fromPulse, true)
+    }
+
     /// Guarda la sesión de la rutina como entrenamiento de fuerza, salvo que el reloj ya haya grabado
     /// un entreno en ese rato (así no se duplica: el del reloj trae pulso y calorías reales).
-    /// Las calorías son las que tu reloj midió en ese rato; Salud no las suma dos veces (elige una fuente).
+    /// Si terminaste otra sesión de Vital hace 10 minutos o menos, las une en un solo entreno.
     @discardableResult
     static func saveStrengthWorkout(name: String, start: Date, end: Date, sets: Int, volumeKg: Double) async -> WorkoutResult {
         guard await authorizeWorkouts(), end > start else { return .failed }
@@ -102,16 +161,72 @@ enum HealthWriter {
             let shared = min(end, w.endDate).timeIntervalSince(max(start, w.startDate))
             return shared >= session * 0.5
         }) { return .watchHadIt }
-        let kcal = await watchActiveEnergy(from: start, to: end)
+        var start = start, name = name, sets = sets, volumeKg = volumeKg
+        let previous = await ownStrengthWorkouts(from: start.addingTimeInterval(-6 * 3600), to: start)
+            .last { start.timeIntervalSince($0.endDate) <= 600 && $0.endDate <= start.addingTimeInterval(60) }
+        if let previous {
+            start = previous.startDate
+            let m = previous.metadata ?? [:]
+            if let old = m["Rutina"] as? String, old != name { name = "\(old) + \(name)" }
+            sets += (m["Series"] as? NSNumber)?.intValue ?? 0
+            volumeKg += (m["VolumenKg"] as? NSNumber)?.doubleValue ?? 0
+        }
+        let energy = await sessionEnergy(from: start, to: end)
         let metadata: [String: Any] = [HKMetadataKeyIndoorWorkout: true, HKMetadataKeyWorkoutBrandName: name, "Rutina": name,
-                                       "Series": sets, "VolumenKg": Int(volumeKg.rounded())]
+                                       "Series": sets, "VolumenKg": Int(volumeKg.rounded()), "KcalPorPulso": energy.estimated]
         do {
-            try await write(start: start, end: end, kcal: kcal, metadata: metadata)
-            return .saved(kcal)
+            try await write(start: start, end: end, kcal: energy.kcal, metadata: metadata)
+            if let previous { try? await store.delete(previous) }
+            return .saved(energy.kcal, estimated: energy.estimated)
         } catch {
             print("Salud: no se pudo guardar el entreno:", error.localizedDescription)
             return .failed
         }
+    }
+
+    private static func ownStrengthWorkouts(from: Date, to: Date) async -> [HKWorkout] {
+        let range = HKQuery.predicateForSamples(withStart: from, end: to)
+        let own = Bundle.main.bundleIdentifier
+        return ((try? await HKSampleQueryDescriptor(predicates: [.workout(range)], sortDescriptors: [SortDescriptor(\.startDate)]).result(for: store)) ?? [])
+            .filter { $0.sourceRevision.source.bundleIdentifier == own && $0.workoutActivityType == .traditionalStrengthTraining }
+    }
+
+    /// Rehace los entrenos de Vital de un día: une los que están separados 10 minutos o menos
+    /// y les pone las kcal calculadas con tu pulso cuando el reloj anotó menos.
+    static func redoDay(_ day: Date) async -> [String] {
+        guard await authorizeWorkouts() else { return ["sin permiso"] }
+        let dayStart = Calendar.current.startOfDay(for: day)
+        let mine = await ownStrengthWorkouts(from: dayStart, to: dayStart.addingTimeInterval(86400))
+        var groups: [[HKWorkout]] = []
+        for w in mine {
+            if let last = groups.last?.last, w.startDate.timeIntervalSince(last.endDate) <= 600 { groups[groups.count - 1].append(w) }
+            else { groups.append([w]) }
+        }
+        var log: [String] = []
+        if let c = await heartRateCalibration() {
+            log.append(String(format: "calibración: %d entrenos del reloj, kcal/min = %.2f + %.4f × pulso", c.workouts, c.a, c.b))
+        } else { log.append("calibración: faltan entrenos del reloj con pulso") }
+        for group in groups {
+            let start = group.first!.startDate, end = group.last!.endDate
+            let names = group.compactMap { $0.metadata?["Rutina"] as? String }
+            var unique: [String] = []
+            for n in names where !unique.contains(n) { unique.append(n) }
+            let name = unique.isEmpty ? "Fuerza" : unique.joined(separator: " + ")
+            let sets = group.reduce(0) { $0 + (($1.metadata?["Series"] as? NSNumber)?.intValue ?? 0) }
+            let volume = group.reduce(0) { $0 + (($1.metadata?["VolumenKg"] as? NSNumber)?.intValue ?? 0) }
+            let had = group.reduce(0.0) { $0 + ($1.statistics(for: energyType)?.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0) }
+            let energy = await sessionEnergy(from: start, to: end)
+            let when = "\(start.formatted(date: .omitted, time: .shortened))–\(end.formatted(date: .omitted, time: .shortened))"
+            guard group.count > 1 || (energy.kcal ?? 0) > had + 1 else { log.append("\(when): sin cambios (\(Int(had)) kcal)"); continue }
+            let metadata: [String: Any] = [HKMetadataKeyIndoorWorkout: true, HKMetadataKeyWorkoutBrandName: name, "Rutina": name,
+                                           "Series": sets, "VolumenKg": volume, "KcalPorPulso": energy.estimated]
+            do {
+                try await write(start: start, end: end, kcal: energy.kcal, metadata: metadata)
+                for w in group { try await store.delete(w) }
+                log.append("\(when): \(group.count) → 1 entreno, \(Int(had)) → \(Int((energy.kcal ?? 0).rounded())) kcal\(energy.estimated ? " (con tu pulso)" : "")")
+            } catch { log.append("\(when): error \(error.localizedDescription)") }
+        }
+        return log
     }
 
     private static func write(start: Date, end: Date, kcal: Double?, metadata: [String: Any]) async throws {

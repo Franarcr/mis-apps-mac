@@ -52,6 +52,9 @@ struct VitalApp: App {
                         print("ENTRENO", await HealthWriter.fixTodayStart(start))
                     }
                 }
+                if ProcessInfo.processInfo.arguments.contains("-rehacer-hoy") {
+                    for line in await HealthWriter.redoDay(.now) { print("REHACER", line) }
+                }
                 if ProcessInfo.processInfo.arguments.contains("-traza-manana") {
                     let day = Calendar.current.startOfDay(for: .now)
                     for line in await HealthWriter.morningTrace(from: day.addingTimeInterval(4.5 * 3600), to: day.addingTimeInterval(7.5 * 3600)) { print("TRAZA", line) }

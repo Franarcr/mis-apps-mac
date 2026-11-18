@@ -381,9 +381,9 @@ struct SessionView: View {
             saving = false
             SessionDraft.clear()
             switch result {
-            case .saved(let kcal):
+            case .saved(let kcal, let estimated):
                 healthMessage = "Vital guardó \(setsText). El entreno quedó en Salud como fuerza tradicional"
-                    + (kcal.map { " con \(Int($0.rounded())) kcal activas medidas por tu reloj." }
+                    + (kcal.map { " con \(Int($0.rounded())) kcal activas " + (estimated ? "calculadas con el pulso que midió tu reloj." : "medidas por tu reloj.") }
                         ?? ", pero el reloj no registró calorías en ese rato.")
             case .watchHadIt:
                 healthMessage = "Vital guardó \(setsText) y las unió al entreno que grabó tu reloj (con su pulso y calorías)."

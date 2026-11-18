@@ -298,6 +298,10 @@ struct AddFoodSheet: View {
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var looking: String?
     @State private var notFound: String?
+    /// Resultados de Open Food Facts para `onlineQuery` (nil: todavía no se buscó o falló).
+    @State private var online: [Food]?
+    @State private var onlineQuery = ""
+    @State private var searchingOnline = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -340,11 +344,14 @@ struct AddFoodSheet: View {
                 if !savedFoods.isEmpty {
                     Section("Tus productos") { ForEach(savedFoods) { row($0) } }
                 }
-                Section("Comida tica") {
-                    ForEach(TicoFoods.all.filter { matches($0) }) { row($0) }
-                }
+                let tico = TicoFoods.all.filter { matches($0) }
+                if !tico.isEmpty { Section("Comida tica") { ForEach(tico) { row($0) } } }
+                let common = CommonFoods.all.filter { matches($0) }
+                if !common.isEmpty { Section("Más comidas") { ForEach(common) { row($0) } } }
+                if !text.trimmingCharacters(in: .whitespaces).isEmpty { onlineSection }
             }
-            .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Buscar: gallo pinto, natilla…")
+            .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Buscar: hamburguesa, palomitas, Doritos…")
+            .onSubmit(of: .search) { Task { await searchOnline() } }
             .navigationTitle("Añadir a \(meal.title.lowercased())")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cerrar") { dismiss() } } }
@@ -410,6 +417,44 @@ struct AddFoodSheet: View {
             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Productos de marca de Open Food Facts que coinciden con lo escrito.
+    @ViewBuilder private var onlineSection: some View {
+        let query = text.trimmingCharacters(in: .whitespaces)
+        Section {
+            if searchingOnline {
+                HStack { ProgressView(); Text("Buscando «\(query)» en internet…").foregroundStyle(.secondary) }
+            } else if onlineQuery == query, let online {
+                if online.isEmpty {
+                    Text("No hay productos con ese nombre en Open Food Facts. Prueba otra palabra, el código de barras o créala a mano.")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else {
+                    ForEach(online) { row($0) }
+                }
+            } else {
+                Button { Task { await searchOnline() } } label: {
+                    Label("Buscar «\(query)» en internet", systemImage: "globe")
+                }
+                if onlineQuery == query, online == nil {
+                    Text("No se pudo conectar con Open Food Facts.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("En internet")
+        } footer: {
+            Text("Productos de marca de Open Food Facts, una base abierta que llena la gente; revisa que los valores tengan sentido. Al añadir uno queda en «Tus productos».")
+        }
+    }
+
+    private func searchOnline() async {
+        let query = text.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty, !searchingOnline else { return }
+        searchingOnline = true
+        let found = await OpenFoodFacts.search(query)
+        searchingOnline = false
+        onlineQuery = query
+        online = found
     }
 
     private func lookUp(_ code: String) async {

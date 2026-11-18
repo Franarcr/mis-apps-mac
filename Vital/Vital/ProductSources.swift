@@ -8,7 +8,6 @@ import VisionKit
 /// Solo se envía el código del producto.
 enum OpenFoodFacts {
     static func product(barcode: String) async -> Food? {
-        let fields = "product_name,product_name_es,brands,nutriments,ingredients_text_es,ingredients_text,additives_tags,categories_tags,serving_quantity,quantity"
         guard let url = URL(string: "https://world.openfoodfacts.org/api/v2/product/\(barcode).json?fields=\(fields)") else { return nil }
         var request = URLRequest(url: url)
         request.setValue("Vital/0.1 (app personal de iPhone)", forHTTPHeaderField: "User-Agent")
@@ -16,7 +15,37 @@ enum OpenFoodFacts {
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               (json["status"] as? Int) == 1, let p = json["product"] as? [String: Any] else { return nil }
+        return food(from: p, barcode: barcode)
+    }
 
+    /// Busca productos por nombre («palomitas», «Doritos»…). Solo se envía el texto buscado.
+    /// Devuelve los que traen calorías, con las imposibles corregidas por sus macros.
+    static func search(_ text: String) async -> [Food]? {
+        var c = URLComponents(string: "https://search.openfoodfacts.org/search")!
+        c.queryItems = [URLQueryItem(name: "q", value: text), URLQueryItem(name: "page_size", value: "30"),
+                        URLQueryItem(name: "langs", value: "es,en"),
+                        URLQueryItem(name: "fields", value: "code,\(fields)")]
+        guard let url = c.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue("Vital/0.1 (app personal de iPhone)", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hits = json["hits"] as? [[String: Any]] else { return nil }
+        var seen = Set<String>()
+        return hits.compactMap { p -> Food? in
+            guard let code = p["code"] as? String, seen.insert(code).inserted,
+                  var food = food(from: p, barcode: code), food.per100.kcal > 0 || food.per100.protein + food.per100.carbs + food.per100.fat > 0
+            else { return nil }
+            _ = food.fixImpossibleKcal()
+            return food
+        }
+    }
+
+    private static let fields = "product_name,product_name_es,brands,nutriments,ingredients_text_es,ingredients_text,additives_tags,categories_tags,serving_quantity,quantity"
+
+    /// Convierte un producto de Open Food Facts (del código o de la búsqueda) en un alimento de Vital.
+    private static func food(from p: [String: Any], barcode: String) -> Food? {
         let n = p["nutriments"] as? [String: Any] ?? [:]
         func num(_ key: String) -> Double? {
             if let d = n[key] as? Double { return d }
@@ -33,7 +62,8 @@ enum OpenFoodFacts {
         let quantity = (p["quantity"] as? String ?? "").lowercased()
         let drink = categories.contains { $0.contains("beverages") || $0.contains("bebidas") } || quantity.contains("ml") || quantity.hasSuffix(" l")
         var portions: [Portion] = []
-        if let serving = p["serving_quantity"] as? Double ?? (p["serving_quantity"] as? String).flatMap(Double.init), serving > 0 {
+        if let serving = p["serving_quantity"] as? Double ?? (p["serving_quantity"] as? Int).map(Double.init)
+            ?? (p["serving_quantity"] as? String).flatMap(Double.init), serving > 0 {
             portions.append(Portion(name: "1 porción", grams: serving))
         }
         // «500 g», «1,5 l», «2 x 250 ml» → el contenido de un envase.
@@ -42,9 +72,11 @@ enum OpenFoodFacts {
            case let total = n * (["kg", "l"].contains(m.output.2) ? 1000 : m.output.2 == "cl" ? 10 : 1), total > 0, total < 3000 {
             portions.append(Portion(name: "Envase completo", grams: total))
         }
-        let name = (p["product_name_es"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? p["product_name"] as? String ?? "Producto \(barcode)"
+        let name = (p["product_name_es"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            ?? (p["product_name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Producto \(barcode)"
         let ingredients = (p["ingredients_text_es"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? p["ingredients_text"] as? String
-        return Food(id: "codigo-\(barcode)", name: name, brand: p["brands"] as? String, per100: nutrients,
+        let brand = p["brands"] as? String ?? (p["brands"] as? [String])?.joined(separator: ", ")
+        return Food(id: "codigo-\(barcode)", name: name, brand: brand, per100: nutrients,
                     portions: portions, isDrink: drink, ingredients: ingredients,
                     additives: p["additives_tags"] as? [String] ?? [], barcode: barcode, source: "código")
     }
