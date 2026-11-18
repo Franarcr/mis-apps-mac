@@ -58,7 +58,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !recorder.isRecording else { return }
         if autoRecord {
             startRecording(app)
-            if recorder.isRecording { prompt.recording(app) { [weak self] in self?.stopRecording() } }
         } else if !declined.contains(app) {
             prompt.ask(app) { [weak self] in
                 self?.startRecording(app)
@@ -75,10 +74,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func startRecording(_ app: CallApp) {
         recorder.start(app)
+        if recorder.isRecording { prompt.recordingBar(app) { [weak self] in self?.stopRecording() } }
         refreshIcon()
         if let error = recorder.lastError, !recorder.isRecording { alert(error) }
         // El micrófono puede pedir permiso primero: se vuelve a mirar en un momento.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refreshIcon() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self else { return }
+            self.refreshIcon()
+            if self.recorder.isRecording, !self.prompt.isShowing {
+                self.prompt.recordingBar(app) { [weak self] in self?.stopRecording() }
+            }
+        }
     }
 
     private func stopRecording() {
@@ -94,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if recorder.isRecording {
             button.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Oído grabando")
             button.contentTintColor = .systemRed
-            button.title = " " + Call.clock(recorder.elapsed)
+            button.title = ""
             button.imagePosition = .imageLeading
             if ticker == nil {
                 ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in

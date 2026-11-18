@@ -84,8 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(entry)
         }
 
-        // Las escondidas se usan desde aquí.
-        let hidden = apps.filter { isHidden($0.id) }
+        // Las escondidas se usan desde aquí. Oído sale siempre: si su icono queda tapado por el notch
+        // en plena grabación, desde aquí se puede detener.
+        let hidden = apps.filter { isHidden($0.id) || ($0.id == "com.fran.oido" && isRunning($0.id)) }
         if !hidden.isEmpty {
             menu.addItem(.separator())
             let title = NSMenuItem(title: "Abrir el menú de", action: nil, keyEquivalent: "")
