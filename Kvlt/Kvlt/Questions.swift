@@ -1,7 +1,19 @@
 import Foundation
 
-enum MetalScene: String, CaseIterable, Identifiable, Codable {
+enum Topic: String, CaseIterable, Identifiable, Codable {
     case noruega, sueciaFinlandia, deathEEUU, thrashEEUU, alemania, europa, latam, guitarra, tuyas
+    case rockClasico, pop, salsa, merengue, rockEspanol
+
+    var genre: Genre {
+        switch self {
+        case .rockClasico: .rockClasico
+        case .pop: .pop
+        case .salsa: .salsa
+        case .merengue: .merengue
+        case .rockEspanol: .rockEspanol
+        default: .metal
+        }
+    }
 
     var id: String { rawValue }
 
@@ -16,6 +28,7 @@ enum MetalScene: String, CaseIterable, Identifiable, Codable {
         case .latam: "Latinoamérica"
         case .guitarra: "Guitarras y técnica"
         case .tuyas: "Costa Rica y tus preguntas"
+        case .rockClasico, .pop, .salsa, .merengue, .rockEspanol: genre.title
         }
     }
 
@@ -30,6 +43,7 @@ enum MetalScene: String, CaseIterable, Identifiable, Codable {
         case .latam: "Belo Horizonte, Medellín, Santiago"
         case .guitarra: "Afinaciones, púa, pastillas"
         case .tuyas: "Las que tú agregas"
+        case .rockClasico, .pop, .salsa, .merengue, .rockEspanol: genre.subtitle
         }
     }
 
@@ -44,20 +58,21 @@ enum MetalScene: String, CaseIterable, Identifiable, Codable {
         case .latam: "globe.americas.fill"
         case .guitarra: "guitars.fill"
         case .tuyas: "square.and.pencil"
+        case .rockClasico, .pop, .salsa, .merengue, .rockEspanol: genre.icon
         }
     }
 }
 
 struct Question: Identifiable, Codable, Hashable {
     var id = UUID()
-    var scene: MetalScene
+    var scene: Topic
     var text: String
     /// La primera es la correcta; se barajan al mostrarlas.
     var options: [String]
     var fact: String
 }
 
-private func q(_ scene: MetalScene, _ text: String, _ right: String, _ w1: String, _ w2: String, _ w3: String, _ fact: String) -> Question {
+private func q(_ scene: Topic, _ text: String, _ right: String, _ w1: String, _ w2: String, _ w3: String, _ fact: String) -> Question {
     Question(scene: scene, text: text, options: [right, w1, w2, w3], fact: fact)
 }
 

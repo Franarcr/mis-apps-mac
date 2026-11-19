@@ -9,260 +9,346 @@ struct KvltApp: App {
             HomeView()
                 .environmentObject(store)
                 .preferredColorScheme(.dark)
-                .tint(Kvlt.blood)
         }
     }
 }
 
-struct RoundChoice: Identifiable {
-    let id = UUID()
-    let scene: MetalScene?
+enum Playing: Identifiable {
+    case match(Match)
+    case duel(Duel)
+
+    var id: ObjectIdentifier {
+        switch self {
+        case .match(let m): ObjectIdentifier(m)
+        case .duel(let d): ObjectIdentifier(d)
+        }
+    }
 }
+
+struct PlayerRef: Identifiable { let id: UUID }
 
 struct HomeView: View {
     @EnvironmentObject var store: Store
-    @State private var playing: RoundChoice?
-    @State private var editing = false
+    @AppStorage("generoElegido") private var selectedRaw = Genre.metal.rawValue
+    @State private var setup: Pick?
+    @State private var pending: Playing?
+    @State private var playing: Playing?
+    @State private var dashboard: PlayerRef?
+    @State private var showBoard = false
+    @State private var showPlayers = false
+    @State private var customFor: Genre?
+
+    private var selected: Genre? { Genre(rawValue: selectedRaw) }
+    private var p: Palette { selected?.palette ?? .mix }
 
     var body: some View {
         ZStack {
-            Kvlt.black.ignoresSafeArea()
+            p.bg.ignoresSafeArea()
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 30) {
                     header
-                    Button { playing = RoundChoice(scene: nil) } label: {
-                        HStack {
-                            Image(systemName: "flame.fill")
-                            Text("Ronda de todas las escenas")
-                            Spacer()
-                            Text("10 preguntas · 15 s").font(.callout).foregroundStyle(Kvlt.bone.opacity(0.7))
-                        }
-                        .font(.title3.weight(.bold))
-                        .padding(20)
-                        .background(Kvlt.blood, in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(Kvlt.bone)
-                    }
-                    .buttonStyle(.plain)
-
-                    Text("Escenas").font(Kvlt.title(26)).foregroundStyle(Kvlt.bone)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                        ForEach(MetalScene.allCases) { scene in sceneCard(scene) }
-                    }
+                    genreStrip
+                    genreSection
+                    playersSection
                 }
                 .padding(32)
                 .frame(maxWidth: 1100)
                 .frame(maxWidth: .infinity)
             }
         }
-        .fullScreenCover(item: $playing) { choice in
-            RoundView(round: Round(scene: choice.scene, pool: store.questions(for: choice.scene)))
-                .environmentObject(store)
+        .tint(p.accent)
+        .animation(.easeInOut(duration: 0.3), value: selectedRaw)
+        .sheet(item: $setup, onDismiss: {
+            if let pending { playing = pending; self.pending = nil }
+        }) { pick in
+            SetupView(pick: pick) { mode, players in
+                let pool = store.questions(pick)
+                pending = mode == .duelo
+                    ? .duel(Duel(pick: pick, players: players, pool: pool))
+                    : .match(Match(pick: pick, mode: mode, players: players, pool: pool))
+            }
+            .environmentObject(store)
         }
-        .sheet(isPresented: $editing) {
-            CustomQuestionsView().environmentObject(store)
+        .fullScreenCover(item: $playing) { game in
+            switch game {
+            case .match(let m): MatchView(match: m).environmentObject(store)
+            case .duel(let d): DuelView(duel: d).environmentObject(store)
+            }
         }
+        .sheet(item: $dashboard) { ref in
+            NavigationStack { DashboardView(playerID: ref.id) }.environmentObject(store)
+        }
+        .sheet(isPresented: $showBoard) { LeaderboardView().environmentObject(store) }
+        .sheet(isPresented: $showPlayers) { PlayersView().environmentObject(store) }
+        .sheet(item: $customFor) { genre in CustomQuestionsView(genre: genre).environmentObject(store) }
     }
+
+    // MARK: Partes
 
     private var header: some View {
-        let rank = Rank.of(store.totalPoints)
-        let next = Rank.next(store.totalPoints)
-        return HStack(alignment: .center, spacing: 24) {
+        HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("KVLT").font(Kvlt.title(64)).foregroundStyle(Kvlt.bone).kerning(6)
-                Text("Trivia de metal extremo y underground").foregroundStyle(Kvlt.ash)
+                Text("ROCKOLA").font(p.title(60)).foregroundStyle(p.text).kerning(5)
+                Text("Trivia musical para jugar solo o con amigos").foregroundStyle(p.dim)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(rank.name.uppercased()).font(Kvlt.title(24)).foregroundStyle(Kvlt.blood)
-                Text("\(store.totalPoints) puntos").font(.headline.monospacedDigit()).foregroundStyle(Kvlt.bone)
-                if let next {
-                    ProgressView(value: Double(store.totalPoints - rank.from), total: Double(next.from - rank.from))
-                        .frame(width: 220)
-                    Text("Faltan \(next.from - store.totalPoints) para \(next.name)").font(.caption).foregroundStyle(Kvlt.ash)
+            Button { showBoard = true } label: {
+                Label("Tabla general", systemImage: "trophy.fill")
+                    .font(.headline)
+                    .padding(.horizontal, 18).padding(.vertical, 12)
+                    .background(p.panel, in: Capsule())
+                    .foregroundStyle(p.text)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var genreStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                genreCard(nil)
+                ForEach(Genre.allCases) { genreCard($0) }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func genreCard(_ g: Genre?) -> some View {
+        let gp = g?.palette ?? .mix
+        let isSelected = (g?.rawValue ?? "todas") == selectedRaw
+        return Button { selectedRaw = g?.rawValue ?? "todas" } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: g?.icon ?? "shuffle").font(.title2).foregroundStyle(gp.accent)
+                Spacer()
+                Text(g?.title ?? "Todos").font(gp.title(19)).foregroundStyle(gp.text).lineLimit(2)
+                Text("\(store.questions(Pick(genre: g)).count) preguntas").font(.caption).foregroundStyle(gp.dim)
+            }
+            .padding(16)
+            .frame(width: 160, height: 136, alignment: .topLeading)
+            .background(gp.panel, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(isSelected ? gp.accent : gp.text.opacity(0.08), lineWidth: isSelected ? 3 : 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var genreSection: some View {
+        let pick = Pick(genre: selected)
+        return VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(selected?.title ?? "Todos los géneros").font(p.title(34)).foregroundStyle(p.text)
+                Text(selected?.subtitle ?? "Preguntas mezcladas de toda la música").foregroundStyle(p.dim)
+            }
+
+            Button { setup = pick } label: {
+                HStack {
+                    Image(systemName: "play.fill")
+                    Text("Jugar")
+                    Spacer()
+                    Text("Récord \(store.best[pick.key, default: 0])").font(.callout.monospacedDigit()).opacity(0.8)
                 }
+                .font(.title3.weight(.bold))
+                .padding(20)
+                .background(p.accent, in: RoundedRectangle(cornerRadius: 14))
+                .foregroundStyle(p.bg)
+            }
+            .buttonStyle(.plain)
+            .disabled(store.questions(pick).isEmpty)
+
+            if selected == .metal {
+                Text("Escenas").font(p.title(24)).foregroundStyle(p.text).padding(.top, 6)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 14)], spacing: 14) {
+                    ForEach(Genre.metal.topics) { topicCard($0) }
+                }
+            } else if let selected {
+                Button { customFor = selected } label: {
+                    Label("Tus preguntas de \(selected.title.lowercased())", systemImage: "square.and.pencil")
+                        .font(.headline)
+                        .padding(.horizontal, 18).padding(.vertical, 12)
+                        .background(p.panel, in: Capsule())
+                        .foregroundStyle(p.text)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    private func sceneCard(_ scene: MetalScene) -> some View {
-        let count = store.questions(for: scene).count
+    private func topicCard(_ topic: Topic) -> some View {
+        let pick = Pick(genre: .metal, topic: topic)
+        let count = store.questions(pick).count
         return Button {
-            if scene == .tuyas && count == 0 { editing = true } else { playing = RoundChoice(scene: scene) }
+            if topic == .tuyas && count == 0 { customFor = .metal } else { setup = pick }
         } label: {
             HStack(spacing: 16) {
-                Image(systemName: scene.icon)
+                Image(systemName: topic.icon)
                     .font(.title2)
                     .frame(width: 52, height: 52)
-                    .background(Kvlt.blood.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(Kvlt.blood)
+                    .background(p.accent.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(p.accent)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(scene.title).font(.headline).foregroundStyle(Kvlt.bone)
-                    Text(scene.subtitle).font(.caption).foregroundStyle(Kvlt.ash)
-                    Text("\(count) preguntas · récord \(store.best[scene.rawValue, default: 0])")
-                        .font(.caption2.monospacedDigit()).foregroundStyle(Kvlt.ash)
+                    Text(topic.title).font(.headline).foregroundStyle(p.text)
+                    Text(topic.subtitle).font(.caption).foregroundStyle(p.dim)
+                    Text("\(count) preguntas · récord \(store.best[pick.key, default: 0])")
+                        .font(.caption2.monospacedDigit()).foregroundStyle(p.dim)
                 }
                 Spacer()
-                if scene == .tuyas {
-                    Button { editing = true } label: { Image(systemName: "plus.circle.fill").font(.title2) }
+                if topic == .tuyas {
+                    Button { customFor = .metal } label: { Image(systemName: "plus.circle.fill").font(.title2) }
                         .buttonStyle(.plain)
-                        .foregroundStyle(Kvlt.bone)
+                        .foregroundStyle(p.text)
                 }
             }
             .padding(16)
-            .background(Kvlt.panel, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Kvlt.bone.opacity(0.08)))
+            .background(p.panel, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(p.text.opacity(0.08)))
         }
         .buttonStyle(.plain)
-        .disabled(count == 0 && scene != .tuyas)
+        .disabled(count == 0 && topic != .tuyas)
+    }
+
+    private var playersSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Jugadores").font(p.title(24)).foregroundStyle(p.text)
+                Spacer()
+                Button("Administrar") { showPlayers = true }.font(.headline)
+            }
+            if store.players.isEmpty {
+                Button { showPlayers = true } label: {
+                    Label("Crea tu jugador para empezar a guardar puntos", systemImage: "person.badge.plus")
+                        .font(.headline)
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(p.panel, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(p.text)
+                }
+                .buttonStyle(.plain)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
+                ForEach(store.players.sorted { $0.points > $1.points }) { pl in
+                    Button { dashboard = PlayerRef(id: pl.id) } label: {
+                        HStack(spacing: 14) {
+                            Avatar(name: pl.name, color: pl.color, size: 48)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(pl.name).font(.headline).foregroundStyle(p.text)
+                                Text("\(Rank.of(pl.points).name) · \(pl.points) pts").font(.caption.monospacedDigit()).foregroundStyle(p.dim)
+                                Text("\(pl.games) partidas · \(pl.accuracy) % aciertos").font(.caption2).foregroundStyle(p.dim)
+                            }
+                            Spacer()
+                            Image(systemName: "chart.bar.fill").foregroundStyle(p.dim)
+                        }
+                        .padding(14)
+                        .background(p.panel, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 }
 
-struct RoundView: View {
+/// Elegir modo y jugadores antes de empezar.
+struct SetupView: View {
+    let pick: Pick
+    let onStart: (GameMode, [Player]) -> Void
+
     @EnvironmentObject var store: Store
-    @StateObject var round: Round
     @Environment(\.dismiss) private var dismiss
-    @State private var saved = false
+    @AppStorage("ultimoModo") private var modeRaw = GameMode.solo.rawValue
+    @State private var chosen: [UUID] = []
+    @State private var newName = ""
+
+    private var mode: GameMode { GameMode(rawValue: modeRaw) ?? .solo }
+    private var poolCount: Int { store.questions(pick).count }
+    private var canStart: Bool { mode.players.contains(chosen.count) && poolCount >= chosen.count }
 
     var body: some View {
-        ZStack {
-            Kvlt.black.ignoresSafeArea()
-            if round.finished {
-                results
-            } else if let item = round.current {
-                question(item)
-            } else {
-                Text("No hay preguntas en esta escena todavía.").foregroundStyle(Kvlt.bone)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            Button { round.stop(); dismiss() } label: {
-                Image(systemName: "xmark.circle.fill").font(.largeTitle).foregroundStyle(Kvlt.ash)
-            }
-            .padding(24)
-        }
-        .onAppear { round.start() }
-        .onChange(of: round.finished) { _, done in
-            if done && !saved {
-                saved = true
-                store.record(round.score, scene: round.scene)
-            }
-        }
-    }
-
-    private func question(_ item: Round.Shown) -> some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack(alignment: .firstTextBaseline) {
-                Text((round.scene?.title ?? "Todas las escenas").uppercased())
-                    .font(.headline).kerning(2).foregroundStyle(Kvlt.blood)
-                Text("· \(round.index + 1) de \(round.items.count)").foregroundStyle(Kvlt.ash)
-                Spacer()
-                if round.streak > 1 {
-                    Label("Racha x\(round.streak)", systemImage: "flame.fill").foregroundStyle(Kvlt.blood).font(.headline)
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Modo", selection: $modeRaw) {
+                        ForEach(GameMode.allCases) { Label($0.title, systemImage: $0.icon).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                    Text(mode.detail).foregroundStyle(.secondary)
+                } header: {
+                    Text(pick.title)
                 }
-                Text("\(round.score)").font(Kvlt.title(30).monospacedDigit()).foregroundStyle(Kvlt.bone)
-                    .padding(.trailing, 60)
-            }
 
-            ProgressView(value: round.timeLeft, total: Round.seconds)
-                .tint(round.timeLeft < 5 ? Kvlt.blood : Kvlt.bone)
-                .animation(.linear(duration: 0.1), value: round.timeLeft)
-
-            Text(item.question.text)
-                .font(Kvlt.title(36))
-                .foregroundStyle(Kvlt.bone)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 12)
-
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
-                ForEach(item.options.indices, id: \.self) { i in
-                    optionButton(item, i)
+                Section {
+                    ForEach(store.players) { pl in
+                        Button { toggle(pl.id) } label: {
+                            HStack(spacing: 12) {
+                                Avatar(name: pl.name, color: pl.color, size: 34)
+                                Text(pl.name).foregroundStyle(.primary)
+                                Spacer()
+                                if let i = chosen.firstIndex(of: pl.id) {
+                                    if mode == .turnos { Text("\(i + 1)º").foregroundStyle(.secondary) }
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(PlayerColor.of(pl.color))
+                                }
+                            }
+                        }
+                    }
+                    HStack {
+                        TextField("Nuevo jugador", text: $newName)
+                            .onSubmit(add)
+                        Button("Agregar", action: add)
+                            .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text(playersHeader)
+                } footer: {
+                    if mode == .turnos { Text("Juegan en el orden en que los marcas.") }
                 }
             }
-
-            if round.answered {
-                feedback(item)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            .navigationTitle("Nueva partida")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Empezar") {
+                        onStart(mode, chosen.compactMap { store.player($0) })
+                        dismiss()
+                    }
+                    .bold()
+                    .disabled(!canStart)
+                }
             }
-            Spacer()
+            .onAppear { if chosen.isEmpty, let first = store.players.first { chosen = [first.id] } }
+            .onChange(of: modeRaw) { _, _ in
+                if chosen.count > mode.players.upperBound { chosen = Array(chosen.prefix(mode.players.upperBound)) }
+            }
         }
-        .padding(40)
-        .frame(maxWidth: 1100)
-        .animation(.easeOut(duration: 0.25), value: round.answered)
     }
 
-    private func optionButton(_ item: Round.Shown, _ i: Int) -> some View {
-        let letters = ["A", "B", "C", "D"]
-        let isRight = i == item.correctIndex
-        let isPicked = round.picked == i
-        let bg: Color = !round.answered ? Kvlt.panel : (isRight ? Kvlt.good.opacity(0.35) : (isPicked ? Kvlt.blood.opacity(0.45) : Kvlt.panel.opacity(0.5)))
-        return Button { round.choose(i) } label: {
-            HStack(spacing: 14) {
-                Text(letters[i])
-                    .font(.headline)
-                    .frame(width: 36, height: 36)
-                    .overlay(Circle().strokeBorder(Kvlt.bone.opacity(0.4)))
-                Text(item.options[i]).font(.title3.weight(.semibold)).multilineTextAlignment(.leading)
-                Spacer()
-                if round.answered && isRight { Image(systemName: "checkmark.circle.fill").foregroundStyle(Kvlt.good) }
-                if round.answered && isPicked && !isRight { Image(systemName: "xmark.circle.fill").foregroundStyle(Kvlt.blood) }
-            }
-            .foregroundStyle(Kvlt.bone)
-            .padding(18)
-            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-            .background(bg, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Kvlt.bone.opacity(0.1)))
-        }
-        .buttonStyle(.plain)
-        .disabled(round.answered)
+    private var playersHeader: String {
+        let r = mode.players
+        if r.lowerBound == r.upperBound { return r.lowerBound == 1 ? "Elige 1 jugador" : "Elige \(r.lowerBound) jugadores" }
+        return "Elige de \(r.lowerBound) a \(r.upperBound) jugadores"
     }
 
-    private func feedback(_ item: Round.Shown) -> some View {
-        let right = round.picked == item.correctIndex
-        return HStack(alignment: .top, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(right ? "¡Correcto! +\(round.lastGain)" : (round.picked == -1 ? "Se acabó el tiempo" : "No era esa"))
-                    .font(Kvlt.title(24))
-                    .foregroundStyle(right ? Kvlt.good : Kvlt.blood)
-                Text(item.question.fact).foregroundStyle(Kvlt.bone.opacity(0.85))
-            }
-            Spacer()
-            Button(round.index + 1 >= round.items.count ? "Ver resultado" : "Siguiente") { round.next() }
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, 28).padding(.vertical, 14)
-                .background(Kvlt.blood, in: Capsule())
-                .foregroundStyle(Kvlt.bone)
-                .buttonStyle(.plain)
+    private func toggle(_ id: UUID) {
+        if let i = chosen.firstIndex(of: id) {
+            chosen.remove(at: i)
+        } else if mode == .solo {
+            chosen = [id]
+        } else if chosen.count < mode.players.upperBound {
+            chosen.append(id)
         }
-        .padding(22)
-        .background(Kvlt.panel, in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private var results: some View {
-        let rank = Rank.of(store.totalPoints)
-        return VStack(spacing: 22) {
-            Text(round.correct >= 9 ? "TRUE" : round.correct >= 6 ? "NADA MAL" : "A ESCUCHAR MÁS DEMOS")
-                .font(Kvlt.title(44)).foregroundStyle(Kvlt.blood).kerning(3)
-            Text("\(round.score)").font(Kvlt.title(96).monospacedDigit()).foregroundStyle(Kvlt.bone)
-            Text("\(round.correct) de \(round.items.count) correctas · mejor racha x\(round.bestStreak)")
-                .font(.title3).foregroundStyle(Kvlt.ash)
-            Text("Rango: \(rank.name) · \(store.totalPoints) puntos en total")
-                .font(.headline).foregroundStyle(Kvlt.bone)
-            HStack(spacing: 16) {
-                Button("Volver") { dismiss() }
-                    .padding(.horizontal, 28).padding(.vertical, 14)
-                    .background(Kvlt.panel, in: Capsule())
-            }
-            .font(.title3.weight(.bold))
-            .foregroundStyle(Kvlt.bone)
-            .buttonStyle(.plain)
-        }
-        .padding(40)
+    private func add() {
+        let name = newName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let p = store.addPlayer(name)
+        newName = ""
+        toggle(p.id)
     }
 }
 
-/// Para agregar preguntas propias, por ejemplo de la escena tica.
+/// Para agregar preguntas propias a cualquier género.
 struct CustomQuestionsView: View {
+    let genre: Genre
+
     @EnvironmentObject var store: Store
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
@@ -273,6 +359,8 @@ struct CustomQuestionsView: View {
     private var valid: Bool {
         ![text, right, wrong[0], wrong[1], wrong[2]].contains { $0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
+
+    private var mine: [Question] { store.custom.filter { $0.scene.genre == genre } }
 
     var body: some View {
         NavigationStack {
@@ -285,25 +373,29 @@ struct CustomQuestionsView: View {
                     }
                     TextField("Dato curioso (opcional)", text: $fact, axis: .vertical)
                     Button("Agregar pregunta") {
-                        store.custom.append(Question(scene: .tuyas, text: text, options: [right] + wrong, fact: fact.isEmpty ? "Pregunta agregada por ti." : fact))
+                        store.custom.append(Question(scene: genre.customTopic, text: text, options: [right] + wrong,
+                                                     fact: fact.isEmpty ? "Pregunta agregada por ti." : fact))
                         text = ""; right = ""; wrong = ["", "", ""]; fact = ""
                     }
                     .disabled(!valid)
                 } header: {
-                    Text("Nueva pregunta")
+                    Text("Nueva pregunta de \(genre.title.lowercased())")
                 } footer: {
-                    Text("Ideal para bandas de Costa Rica y de la escena local. Las respuestas se barajan solas.")
+                    Text("Ideal para bandas y artistas de Costa Rica. Las respuestas se barajan solas.")
                 }
 
-                if !store.custom.isEmpty {
-                    Section("Tus preguntas (\(store.custom.count))") {
-                        ForEach(store.custom) { q in
+                if !mine.isEmpty {
+                    Section("Tus preguntas (\(mine.count))") {
+                        ForEach(mine) { q in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(q.text)
                                 Text("Respuesta: \(q.options[0])").font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                        .onDelete { store.custom.remove(atOffsets: $0) }
+                        .onDelete { offsets in
+                            let ids = offsets.map { mine[$0].id }
+                            store.custom.removeAll { ids.contains($0.id) }
+                        }
                     }
                 }
             }
