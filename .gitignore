@@ -12,3 +12,6 @@ rea/
 
 # Python
 __pycache__/
+
+# Xcode (estado personal)
+xcuserdata/

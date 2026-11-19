@@ -29,6 +29,9 @@ import UIKit
     /// Mientras se aplican cambios del otro equipo no se marcan fechas ni se reenvía nada.
     @ObservationIgnored private(set) var applyingRemote = false
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    /// Equipos que el buscador ve ahora en la red.
+    @ObservationIgnored private var visible: [String: NWEndpoint] = [:]
+    @ObservationIgnored private var heartbeat: Timer?
 
     static let deviceID: String = {
         let key = "hecho.sync.equipo"
@@ -61,17 +64,63 @@ import UIKit
             })
         }
         restartNetwork()
+        if heartbeat == nil {
+            // Cada 4 s: avisa que sigue aquí, descarta conexiones muertas y reconecta si hace falta.
+            heartbeat = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.tick() }
+            }
+        }
     }
 
     @ObservationIgnored private var wasInBackground = false
 
     /// Al volver a la app (el iPhone corta la red en segundo plano) se vuelve a anunciar y buscar.
+    /// Al activarse se pide al otro equipo lo suyo, para ver al instante lo que se hizo allá.
     func scenePhaseChanged(to phase: ScenePhase) {
-        if phase == .background { wasInBackground = true }
-        if phase == .active && wasInBackground {
-            wasInBackground = false
-            restartNetwork()
+        switch phase {
+        case .background:
+            wasInBackground = true
+            flushBeforeSleep()
+        case .inactive:
+            flushBeforeSleep()
+        case .active:
+            if wasInBackground || readyPeers.isEmpty {
+                wasInBackground = false
+                restartNetwork()
+            } else {
+                for peer in readyPeers { send(to: peer, askBack: true) }
+            }
+        @unknown default: break
         }
+    }
+
+    private var readyPeers: [Peer] { peers.values.filter { $0.connection.state == .ready } }
+
+    /// Antes de que el iPhone se duerma, manda ya lo pendiente (sin esperar el segundo de espera).
+    private func flushBeforeSleep() {
+        guard sendTask != nil, !readyPeers.isEmpty else { return }
+        sendTask?.cancel()
+        sendTask = nil
+        #if os(iOS)
+        let id = UIApplication.shared.beginBackgroundTask(withName: "Hecho sync")
+        for peer in readyPeers { send(to: peer) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { UIApplication.shared.endBackgroundTask(id) }
+        #else
+        for peer in readyPeers { send(to: peer) }
+        #endif
+        lastSync = .now
+    }
+
+    private func tick() {
+        let now = Date()
+        for peer in peers.values {
+            if peer.connection.state == .ready, now.timeIntervalSince(peer.lastHeard) > 14 {
+                peer.connection.cancel()   // no responde: conexión muerta
+            } else if peer.connection.state == .ready {
+                ping(peer)
+            }
+        }
+        connectMissing()
     }
 
     func restartNetwork() {
@@ -118,21 +167,39 @@ import UIKit
         browser = nil
         for peer in peers.values { peer.connection.cancel() }
         peers.removeAll()
+        visible.removeAll()
         updateNames()
     }
 
     // MARK: Conexiones
 
     private func found(_ results: Set<NWBrowser.Result>) {
+        var now: [String: NWEndpoint] = [:]
         for result in results {
             guard case .service(let name, _, _, _) = result.endpoint, name != Self.deviceID else { continue }
-            // Solo conecta el de identificador menor, para no abrir dos conexiones entre los mismos equipos.
-            guard Self.deviceID < name, !peers.values.contains(where: { $0.deviceID == name }) else { continue }
-            let params = NWParameters.tcp
-            params.includePeerToPeer = true
-            let connection = NWConnection(to: result.endpoint, using: params)
-            adopt(connection, deviceID: name)
+            now[name] = result.endpoint
         }
+        // Un equipo que reaparece (por ejemplo, el iPhone al volver a abrir Hecho): la conexión vieja ya no sirve.
+        for (name, endpoint) in now where visible[name] == nil && Self.deviceID < name {
+            for old in peers.values where old.deviceID == name { old.connection.cancel() }
+            connect(name, endpoint)
+        }
+        visible = now
+        connectMissing()
+    }
+
+    /// Solo conecta el de identificador menor, para no abrir dos conexiones entre los mismos equipos.
+    private func connectMissing() {
+        for (name, endpoint) in visible where Self.deviceID < name {
+            let alive = peers.values.contains { $0.deviceID == name && $0.connection.state != .cancelled }
+            if !alive { connect(name, endpoint) }
+        }
+    }
+
+    private func connect(_ name: String, _ endpoint: NWEndpoint) {
+        let params = NWParameters.tcp
+        params.includePeerToPeer = true
+        adopt(NWConnection(to: endpoint, using: params), deviceID: name)
     }
 
     private func adopt(_ connection: NWConnection, deviceID: String? = nil) {
@@ -181,16 +248,19 @@ import UIKit
 
     private func handle(_ data: Data, from peer: Peer) {
         guard let message = try? Self.decoder.decode(SyncMessage.self, from: data) else { return }
+        peer.lastHeard = .now
         peer.deviceID = message.device
         peer.name = message.name
-        // Si quedaron dos conexiones con el mismo equipo, se cierra la repetida.
-        if peers.values.contains(where: { $0 !== peer && $0.deviceID == message.device }) {
-            peer.connection.cancel()
-            return
+        // Si quedaron dos conexiones con el mismo equipo, la vieja sobra (el otro se reconectó).
+        for old in peers.values where old !== peer && old.deviceID == message.device && old.opened < peer.opened {
+            old.connection.cancel()
+            peers[ObjectIdentifier(old)] = nil
         }
         updateNames()
-        merge(message.snapshot)
+        guard let snapshot = message.snapshot else { return }   // solo un «sigo aquí»
+        merge(snapshot)
         lastSync = .now
+        if message.askBack == true { send(to: peer) }
     }
 
     private func updateNames() {
@@ -199,9 +269,16 @@ import UIKit
 
     // MARK: Envío
 
-    private func send(to peer: Peer) {
-        guard let data = try? Self.encoder.encode(SyncMessage(device: Self.deviceID, name: Self.deviceName, snapshot: snapshot()))
-        else { return }
+    private func send(to peer: Peer, askBack: Bool = false) {
+        write(SyncMessage(device: Self.deviceID, name: Self.deviceName, snapshot: snapshot(), askBack: askBack), to: peer)
+    }
+
+    private func ping(_ peer: Peer) {
+        write(SyncMessage(device: Self.deviceID, name: Self.deviceName, snapshot: nil), to: peer)
+    }
+
+    private func write(_ message: SyncMessage, to peer: Peer) {
+        guard let data = try? Self.encoder.encode(message) else { return }
         var frame = withUnsafeBytes(of: UInt32(data.count).bigEndian) { Data($0) }
         frame.append(data)
         peer.connection.send(content: frame, completion: .contentProcessed { _ in })
@@ -211,9 +288,10 @@ import UIKit
         guard !applyingRemote, !peers.isEmpty else { return }
         sendTask?.cancel()
         sendTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            for peer in self.peers.values where peer.connection.state == .ready { self.send(to: peer) }
+            self.sendTask = nil
+            for peer in self.readyPeers { self.send(to: peer) }
             self.lastSync = .now
         }
     }
@@ -437,6 +515,8 @@ private final class Peer {
     let connection: NWConnection
     var deviceID: String?
     var name: String?
+    let opened = Date()
+    var lastHeard = Date()
     init(connection: NWConnection) { self.connection = connection }
 }
 
@@ -511,5 +591,8 @@ struct Snapshot: Codable {
 struct SyncMessage: Codable {
     var device: String
     var name: String
-    var snapshot: Snapshot
+    /// nil: solo avisa que sigue conectado.
+    var snapshot: Snapshot?
+    /// Pide que el otro conteste con lo suyo.
+    var askBack: Bool? = nil
 }
