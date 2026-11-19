@@ -144,6 +144,7 @@ struct StatusView: View {
     @ObservedObject var photos: PhotosModel
     let go: (AppSection) -> Void
     private let palette = Palette.status
+    @State private var width: CGFloat = 1000
 
     var body: some View {
         ScrollArea {
@@ -155,7 +156,9 @@ struct StatusView: View {
                     palette: palette
                 )
 
-                HStack(alignment: .top, spacing: 20) {
+                // En vertical (o con la barra lateral abierta) las tarjetas van una debajo de otra.
+                let layout = width > 760 ? AnyLayout(HStackLayout(alignment: .top, spacing: 20)) : AnyLayout(VStackLayout(spacing: 20))
+                layout {
                     scoreCard
                     VStack(spacing: 16) {
                         diskCard
@@ -211,6 +214,7 @@ struct StatusView: View {
             }
             .padding(24)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onAppear { model.refresh(photoJunk: photos.lastScan == nil ? nil : photos.suggestedBytes) }
         .refreshable { model.refresh(photoJunk: photos.lastScan == nil ? nil : photos.suggestedBytes) }
     }

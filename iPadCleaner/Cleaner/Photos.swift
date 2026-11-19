@@ -17,27 +17,24 @@ struct SimilarGroup: Identifiable {
 }
 
 enum PhotoCategory: String, CaseIterable, Identifiable {
-    case similar, screenshots, videos
+    case similar, screenshots
     var id: String { rawValue }
     var title: String {
         switch self {
         case .similar: "Repetidas y parecidas"
         case .screenshots: "Capturas de pantalla"
-        case .videos: "Videos pesados"
         }
     }
     var icon: String {
         switch self {
         case .similar: "square.on.square"
         case .screenshots: "camera.viewfinder"
-        case .videos: "video.fill"
         }
     }
     var detail: String {
         switch self {
         case .similar: "Fotos iguales o casi iguales. Se conserva la mejor de cada grupo."
         case .screenshots: "Se marcan las de hace más de 30 días."
-        case .videos: "Videos de más de 100 MB. No se marca ninguno: tú decides."
         }
     }
 }
@@ -50,21 +47,19 @@ final class PhotosModel: ObservableObject {
     @Published var progressText = ""
     @Published var groups: [SimilarGroup] = []
     @Published var screenshots: [MediaItem] = []
-    @Published var videos: [MediaItem] = []
     @Published var selected: Set<String> = []
     @Published var lastScan: Date?
     @Published var message: String?
     @Published var freedTotal: Int64 = 0
 
     var allItems: [MediaItem] {
-        groups.flatMap(\.items) + screenshots + videos
+        groups.flatMap(\.items) + screenshots
     }
 
     func items(_ category: PhotoCategory) -> [MediaItem] {
         switch category {
         case .similar: groups.flatMap(\.items)
         case .screenshots: screenshots
-        case .videos: videos
         }
     }
 
@@ -108,7 +103,6 @@ final class PhotosModel: ObservableObject {
 
         groups = result.groups
         screenshots = result.screenshots
-        videos = result.videos
         // Selección sugerida.
         var sel = Set<String>()
         for g in groups { for item in g.items where item.id != g.keepID { sel.insert(item.id) } }
@@ -157,7 +151,6 @@ final class PhotosModel: ObservableObject {
                 return SimilarGroup(id: g.id, items: rest, keepID: keep)
             }
             screenshots.removeAll { ids.contains($0.id) }
-            videos.removeAll { ids.contains($0.id) }
             selected.subtract(ids)
             freedTotal += bytes
             message = "Listo: \(Format.bytes(bytes)) a «Eliminados recientemente». Para liberar el espacio ya, vacíalo en la app Fotos."
@@ -172,7 +165,6 @@ enum PhotoScanner {
     struct Result {
         var groups: [SimilarGroup] = []
         var screenshots: [MediaItem] = []
-        var videos: [MediaItem] = []
     }
 
     static func fileSize(_ asset: PHAsset) -> Int64 {
@@ -187,17 +179,6 @@ enum PhotoScanner {
         var out = Result()
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-
-        // Videos
-        let videoFetch = PHAsset.fetchAssets(with: .video, options: options)
-        var vids: [MediaItem] = []
-        videoFetch.enumerateObjects { asset, _, _ in
-            let size = fileSize(asset)
-            if size >= 100_000_000 {
-                vids.append(MediaItem(id: asset.localIdentifier, asset: asset, size: size))
-            }
-        }
-        out.videos = vids.sorted { $0.size > $1.size }
 
         // Fotos
         let imageFetch = PHAsset.fetchAssets(with: .image, options: options)
@@ -332,7 +313,7 @@ struct PhotosView: View {
             VStack(alignment: .leading, spacing: 20) {
                 ModuleHeader(
                     title: "Limpiar Fotos",
-                    subtitle: model.message ?? "Busca fotos repetidas, capturas y videos pesados. Lo que borres va a «Eliminados recientemente» y se puede recuperar por 30 días.",
+                    subtitle: model.message ?? "Busca fotos repetidas y capturas viejas. Lo que borres va a «Eliminados recientemente» y se puede recuperar por 30 días.",
                     icon: "photo.on.rectangle.angled",
                     palette: palette
                 )

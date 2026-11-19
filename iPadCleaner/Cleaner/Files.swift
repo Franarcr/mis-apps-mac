@@ -75,14 +75,27 @@ final class FilesModel: ObservableObject {
     init() {
         if let data = UserDefaults.standard.data(forKey: bookmarkKey) {
             var stale = false
-            if let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) {
+            if let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale), !Self.isInCloud(url) {
                 folder = url
                 if stale { save(url) }
             }
         }
     }
 
+    /// Solo se aceptan carpetas guardadas en el iPad: borrar en iCloud Drive no libera espacio aquí.
+    static func isInCloud(_ url: URL) -> Bool {
+        if (try? url.resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true { return true }
+        return url.path.contains("/Mobile Documents/") || FileManager.default.isUbiquitousItem(at: url)
+    }
+
     func choose(_ url: URL) {
+        let access = url.startAccessingSecurityScopedResource()
+        if Self.isInCloud(url) {
+            if access { url.stopAccessingSecurityScopedResource() }
+            message = "Esa carpeta está en iCloud Drive. Elige una dentro de «En mi iPad»: Cleaner solo limpia lo que ocupa espacio en el iPad."
+            return
+        }
+        if access { url.stopAccessingSecurityScopedResource() }
         folder?.stopAccessingSecurityScopedResource()
         _ = url.startAccessingSecurityScopedResource()
         folder = url
@@ -119,7 +132,7 @@ final class FilesModel: ObservableObject {
         selected = Set(duplicates.flatMap { $0.files.dropFirst().map(\.url) })
         selectedLarge = []
         if result.count == 0 {
-            message = "No encontré archivos en esa carpeta. Si es de iCloud Drive, ábrela una vez en la app Archivos y vuelve a intentar."
+            message = "No encontré archivos guardados en el iPad dentro de esa carpeta."
         }
         lastScan = Date()
         isScanning = false
@@ -187,7 +200,9 @@ enum FileScanner {
         }
         for case let url as URL in walker {
             guard let v = try? url.resourceValues(forKeys: Set(keys)), v.isRegularFile == true else { continue }
-            let inCloud = v.isUbiquitousItem == true && v.ubiquitousItemDownloadingStatus != .current
+            // Lo que está en iCloud no ocupa (o no libera) espacio en el iPad: se ignora.
+            let inCloud = v.isUbiquitousItem == true
+            if inCloud { continue }
             let size = Int64(v.fileSize ?? v.totalFileAllocatedSize ?? 0)
             entries.append(FileEntry(url: url, size: size, created: v.creationDate, inCloud: inCloud))
             if entries.count % 200 == 0 { progress("Encontrados \(entries.count) archivos…") }
@@ -245,7 +260,7 @@ struct FolderBar: View {
                     Text(model.folder?.lastPathComponent ?? "Ninguna carpeta elegida")
                         .font(.headline)
                     Text(model.folder == nil
-                         ? "Elige una carpeta de Archivos o iCloud Drive para revisarla."
+                         ? "Elige una carpeta de «En mi iPad» para revisarla."
                          : (model.lastScan.map { "Revisada a las \($0.formatted(date: .omitted, time: .shortened))" } ?? "Sin revisar todavía"))
                         .font(.caption).foregroundStyle(.white.opacity(0.7))
                 }
@@ -449,7 +464,7 @@ struct DuplicatesView: View {
                     CenteredMessage(icon: "", title: model.progressText, showsProgress: true).frame(height: 240)
                 } else if model.lastScan != nil {
                     if model.duplicates.isEmpty {
-                        CenteredMessage(icon: "sparkles", title: "Sin duplicados", detail: "No hay archivos repetidos en esta carpeta. Los que están solo en iCloud no se comparan.")
+                        CenteredMessage(icon: "sparkles", title: "Sin duplicados", detail: "No hay archivos repetidos en esta carpeta.")
                             .frame(height: 220)
                     } else {
                         Text("\(model.duplicates.count) grupos · se pueden liberar \(Format.bytes(model.duplicates.reduce(0) { $0 + $1.wasted }))")

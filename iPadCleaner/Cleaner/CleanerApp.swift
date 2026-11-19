@@ -75,6 +75,8 @@ struct RootView: View {
             }
             .toolbarBackground(.hidden, for: .navigationBar)
         }
+        // En vertical la lista de secciones se abre encima y no le quita espacio al contenido.
+        .navigationSplitViewStyle(.prominentDetail)
     }
 
     @ViewBuilder
