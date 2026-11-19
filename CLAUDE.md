@@ -28,17 +28,56 @@ propio `CLAUDE.md` con el detalle; léelo antes de tocar ese proyecto y ponlo al
 
 ## Proyectos
 
-| Carpeta | Qué es | Estado |
-| --- | --- | --- |
-| `Vital/` | App de salud estilo Bevel (iPhone + widgets) | Activa, ver su CLAUDE.md |
-| `Oido/` + `Barra/` | Graba y resume llamadas en el Mac; Barra agrupa los iconos de la barra de menús | Activa |
-| `Hecho/` | Tareas estilo Things (Mac + iPhone) | Etapas 1–2 + sincronización Wi-Fi |
-| `Kvlt/` | «Rockola», trivia musical para el iPad | Activa |
-| `iPadCleaner/` | «Cleaner», limpieza del iPad | Terminada |
-| `Mascota/` | Tuqui, el tucán que camina por la pantalla del Mac | Nueva |
-| `PanelClaude/` | Panel de Claude (chats, uso, MCP) en el Mac y en un artefacto | Nueva |
-| `InicioTV/`, `InicioMiTV/`, `InicioLG/` | Pantalla de inicio estilo Apple TV en los 3 TVs | Terminadas (datos en la memoria) |
-| Resto (Captura, Portapapeles, Revela, …) | Apps de barra de menús y utilidades del Mac | Terminadas |
+Cada carpeta tiene su `CLAUDE.md` o su `README.md`/`LEEME.md` con el detalle.
+
+**iPhone / iPad**
+
+| Carpeta | Qué es |
+| --- | --- |
+| `Vital/` | App de salud estilo Bevel (iPhone + widgets): sueño, entreno, ayuno, comidas, cuentas de días |
+| `Hecho/` | Tareas estilo Things (Mac + iPhone), sincronización por Wi-Fi |
+| `Kvlt/` | «Rockola», trivia musical de 6 géneros para el iPad |
+| `iPadCleaner/` | «Cleaner», limpieza del iPad |
+
+**Mac: barra de menús**
+
+| Carpeta | Qué es |
+| --- | --- |
+| `Barra/` | Junta en un icono las demás apps de barra de menús |
+| `Oido/` | Graba, transcribe y resume llamadas |
+| `Captura/` | Capturas y grabación de pantalla (estilo CleanShot) |
+| `Portapapeles/` | Historial del portapapeles |
+| `Puntos/` | 7 notas rápidas (estilo Tot) |
+| `Monitor/` | Widget flotante con CPU, memoria, red… |
+| `Ventanas/` | Cambia el comportamiento de los botones de las ventanas |
+| `Volumen/` | Volumen por app |
+| `Barrendero/` | Limpia el correo de Mail cada semana con reglas |
+| `Guardian/` | Vigila accesos por AnyDesk |
+| `Mascota/` | Tuqui, el tucán que camina por la pantalla |
+
+**Mac: apps con ventana**
+
+| Carpeta | Qué es |
+| --- | --- |
+| `Revela/` | Editor de fotos (estilo Luminar Neo) |
+| `Lienzo/` | Pizarra infinita con importación de Miro |
+| `Batido/` | Editor web con vista previa en vivo |
+| `Antena/` | Analizador de redes Wi-Fi |
+| `Historietas/` | Lector de cómics CBZ/CBR |
+| `Compresor/` | Comprimir y extraer archivos |
+| `Grabador/` | Graba imágenes de sistemas en USB/SD |
+| `Lazo/` | Organizador de ventanas (estilo Lasso) |
+| `PanelClaude/` | Panel de Claude (chats, uso, MCP) en el Mac y en un artefacto |
+| `Vitrina/` | Instala las apps caseras en otro Mac (DMG) |
+
+**TVs y otros**
+
+| Carpeta | Qué es |
+| --- | --- |
+| `InicioTV/`, `InicioMiTV/`, `InicioLG/` | Inicio estilo Apple TV en el JVC, el Xiaomi y el LG |
+| `FormsMCP/` | Servidor MCP para leer módulos de Oracle Forms |
+| `naret-cobros/` | Resumen de los cobros del condominio (tarea programada) |
+| `iconos/` | Iconos de las apps y `crear-icono.swift` |
 
 Tareas programadas aparte: `cobros-naret` (cobros del condominio) y `filtro-publicidad` (correo); sus detalles
 están en la memoria de Claude.
