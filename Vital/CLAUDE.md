@@ -39,11 +39,39 @@ Lee esto entero antes de tocar recuperación, energía, estrés o entreno.
 
 - No hay app de Vital en el reloj (el emparejamiento con Xcode falla). Para pulso y calorías reales, Fran debe
   iniciar «Fuerza tradicional» en la app **Entreno de Apple**; Vital une sus series a ese entreno.
-- Sin entreno en el reloj, Vital guarda en Salud un entreno de fuerza con las kcal activas que el reloj midió
-  en ese rato (bajas: el reloj muestrea poco sin entreno iniciado).
+- Sin entreno en el reloj, las kcal activas que mide el reloj salen ridículamente bajas (muestrea poco).
+  Por eso `HealthWriter.swift` las **estima con el pulso** (172913a):
+  - Hace un ajuste lineal kcal/min = a + b·pulso medio con sus entrenos del reloj de los últimos 120 días
+    (`HeartRateCalibration`). Con 154 entrenos dio a = −4,34 y b = 0,0947.
+  - Necesita al menos 1 muestra de pulso cada 5 min. Usa lo mayor entre lo medido y lo estimado, y lo marca con
+    la clave de metadatos `KcalPorPulso`.
+- Dos rutinas seguidas (≤ 10 min entre una y otra) se unen en un solo entreno: los nombres se unen con « + » y
+  se suman series y volumen. `-rehacer-hoy` rehace los entrenos de Vital del día.
 - La sesión se guarda en cada cambio (UserDefaults `sesionEnCurso` + SetLog al marcar); se puede retomar.
 - Pirámide: el peso sale de su mejor serie de la última vez (Epley, 2 repeticiones en reserva). No se castiga
   hacer menos repeticiones con más peso.
+
+## Escondido: recuperación, estrés y energía (fc126c6)
+
+Fran se frustró porque casi siempre quedaban lejos de Bevel y pidió esconderlas. `Hidden.swift` tiene
+`Hidden.recoveryStressEnergy = true`. Con eso:
+
+- en Salud no salen esas tarjetas;
+- en Entreno la tarjeta de esfuerzo no muestra objetivo;
+- las rutinas, el ayuno y el enlace con el reloj reciben `nil` como recuperación.
+
+El código sigue ahí: para volver a mostrarlas basta con poner `false`, y solo si Fran lo pide.
+
+## Cuentas (pestaña 6, fc126c6)
+
+- Sirven para contar días **Desde** algo (p. ej. sin azúcar) o **Hasta** algo (p. ej. un viaje).
+- Código: `FastingShared/Counters.swift` (modelo, guardado en el app group, clave `cuentas`) y
+  `Vital/CountersTab.swift` (lista, detalle y editor).
+- Una cuenta «Desde» tiene «Volví a empezar», que guarda el intento con su récord e historial.
+- Una cuenta «Hasta» avisa el día que llega, a las 8:00 o a la hora puesta (notificación `cuenta-<id>`), y luego
+  pasa a «Terminadas».
+- El widget «Cuenta de días» está en `VitalWidgets/CounterWidget.swift` (kind `VitalCuentas`) y muestra la cuenta
+  marcada con «Mostrar en el widget».
 
 ## Comandos útiles
 
