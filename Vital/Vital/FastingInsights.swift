@@ -167,7 +167,7 @@ enum FastingInsights {
     @MainActor
     static func tip(health: VitalModel, workouts: [Workout], sessions: [FastingSession], weight: Double, goal: Double) -> FastingTip? {
         let active = sessions.last(where: \.isActive)
-        if let t = trainingAdvice(recovery: health.todayRecovery, workouts: workouts, active: active, goal: goal) { return t }
+        if let t = trainingAdvice(recovery: Hidden.recoveryStressEnergy ? nil : health.todayRecovery, workouts: workouts, active: active, goal: goal) { return t }
         let plan = proteinPlan(weight: weight, goal: goal)
         if plan.isHard {
             return FastingTip(icon: "fork.knife", signal: .fair,

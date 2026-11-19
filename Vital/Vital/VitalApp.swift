@@ -29,6 +29,9 @@ struct VitalApp: App {
                 Tab("Ayuno", systemImage: "timer", value: "ayuno") {
                     FastingTab()
                 }
+                Tab("Cuentas", systemImage: "calendar.badge.clock", value: "cuentas") {
+                    CountersTab()
+                }
             }
             .environment(\.openFastingTab, OpenFastingTab { tab = "ayuno" })
             .task {

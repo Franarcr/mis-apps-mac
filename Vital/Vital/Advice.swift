@@ -48,7 +48,7 @@ enum Advice {
                             text: "Te acuestas a horas muy distintas (± \(Int(bedtime.spread)) min). Un horario regular mejora la calidad del sueño tanto como dormir más.",
                             signal: .fair))
         }
-        if tips.isEmpty, let recovery = model.todayRecovery {
+        if tips.isEmpty, !Hidden.recoveryStressEnergy, let recovery = model.todayRecovery {
             tips.append(recovery.signal == .good
                 ? Tip(icon: "figure.run", text: "Todo está en tu rango. Buen día para un entrenamiento exigente.", signal: .good)
                 : Tip(icon: "checkmark.circle.fill", text: "Tus medidas están en tu rango. Entrena con normalidad, sin forzar.", signal: .good))

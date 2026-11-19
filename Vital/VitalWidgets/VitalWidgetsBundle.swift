@@ -6,5 +6,6 @@ struct VitalWidgetsBundle: WidgetBundle {
     var body: some Widget {
         FastingWidget()
         FastingLiveActivity()
+        CounterWidget()
     }
 }

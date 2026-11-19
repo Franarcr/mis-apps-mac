@@ -21,7 +21,7 @@ struct TrainingView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         StrainCard(strain: model.todayStrain, target: TrainingModel.target(for: health.todayRecovery),
-                                   recovery: health.todayRecovery)
+                                   recovery: health.todayRecovery, showTarget: !Hidden.recoveryStressEnergy)
                         LoadCard(model: model)
                         FitnessCard(model: model)
                         WorkoutsCard(model: model)
@@ -48,9 +48,12 @@ private struct StrainCard: View {
     let strain: Int
     let target: ClosedRange<Int>
     let recovery: Recovery?
+    /// El objetivo sale de la recuperación: si está escondida, solo se muestra el esfuerzo.
+    var showTarget = true
 
     private var signal: Signal {
-        target.contains(strain) ? .good : strain > target.upperBound + 10 ? .poor : .fair
+        guard showTarget else { return .good }
+        return target.contains(strain) ? .good : strain > target.upperBound + 10 ? .poor : .fair
     }
 
     var body: some View {
@@ -59,10 +62,12 @@ private struct StrainCard: View {
                 ZStack {
                     Circle().stroke(.white.opacity(0.1), lineWidth: 16)
                     // Zona recomendada para hoy, en gris claro detrás.
-                    Circle()
-                        .trim(from: Double(target.lowerBound) / 100, to: Double(target.upperBound) / 100)
-                        .stroke(.white.opacity(0.25), style: StrokeStyle(lineWidth: 16))
-                        .rotationEffect(.degrees(-90))
+                    if showTarget {
+                        Circle()
+                            .trim(from: Double(target.lowerBound) / 100, to: Double(target.upperBound) / 100)
+                            .stroke(.white.opacity(0.25), style: StrokeStyle(lineWidth: 16))
+                            .rotationEffect(.degrees(-90))
+                    }
                     Circle()
                         .trim(from: 0, to: Double(strain) / 100)
                         .stroke(Color.cyan.gradient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
@@ -77,8 +82,10 @@ private struct StrainCard: View {
                 .frame(width: 180, height: 180)
                 .padding(.top, 4)
 
-                Text("Objetivo para hoy: \(target.lowerBound)–\(target.upperBound)").font(.title3.bold())
-                Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                if showTarget {
+                    Text("Objetivo para hoy: \(target.lowerBound)–\(target.upperBound)").font(.title3.bold())
+                    Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
             }
             .frame(maxWidth: .infinity)
         }

@@ -28,7 +28,7 @@ final class PhoneWatchLink: NSObject, ObservableObject {
             WatchRoutine(id: String(Int(routine.createdAt.timeIntervalSince1970)), name: routine.name, items: routine.sortedItems.compactMap { item in
                 guard let exercise = item.exercise else { return nil }
                 let s = LoadAdvisor.suggest(for: item, history: history, bodyWeight: profile.bodyWeight, female: profile.female,
-                                            level: profile.level, recovery: health.todayRecovery)
+                                            level: profile.level, recovery: Hidden.recoveryStressEnergy ? nil : health.todayRecovery)
                 return WatchItem(exerciseID: item.exerciseID, name: exercise.name, weighted: exercise.equipment.isWeighted,
                                  plan: s.plan.map { WatchSet(weight: $0.weight.map { (profile.unit.show($0) * 2).rounded() / 2 }, reps: $0.reps) },
                                  rest: item.restSeconds, note: s.reason)

@@ -45,9 +45,11 @@ struct TodayView: View {
             Label("Datos de ejemplo (simulador)", systemImage: "flask")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        RecoveryCard(recovery: model.todayRecovery, live: model.todayRecovery.flatMap { r in stress.result?.charge(recovery: r.score) }.map(Recovery.init),
-                     daysWithHRV: model.daysWithHRV, provisionalUntil: model.provisionalUntil)
-        if let result = stress.result { StressEnergyCard(result: result) }
+        if !Hidden.recoveryStressEnergy {
+            RecoveryCard(recovery: model.todayRecovery, live: model.todayRecovery.flatMap { r in stress.result?.charge(recovery: r.score) }.map(Recovery.init),
+                         daysWithHRV: model.daysWithHRV, provisionalUntil: model.provisionalUntil)
+            if let result = stress.result { StressEnergyCard(result: result) }
+        }
         FastingSummaryCard()
         let tips = Advice.tips(for: model)
         if !tips.isEmpty { TipsCard(tips: tips) }

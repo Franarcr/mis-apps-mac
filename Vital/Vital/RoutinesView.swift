@@ -94,7 +94,7 @@ struct RoutinesView: View {
             }
             .sheet(isPresented: $showingProfile) { ProfileSheet() }
             .fullScreenCover(item: $session) { routine in
-                SessionView(routine: routine, recovery: health.todayRecovery)
+                SessionView(routine: routine, recovery: Hidden.recoveryStressEnergy ? nil : health.todayRecovery)
             }
             .task { await readProfileOnce() }
             .onAppear { ExerciseCatalog.custom = customExercises.map(\.asExercise) }
