@@ -37,10 +37,17 @@ struct ConcertsView: View {
                     section("Velocidad: \(Int((speed * 100).rounded())) %") {
                         Slider(value: $speed, in: 0.6...1.2, step: 0.05).tint(stage.accent)
                     }
-                    section("Riffs") {
-                        VStack(spacing: 12) { ForEach(Riff.all) { riffCard($0) } }
+                    section("Riffs con la \(guitar.name)") {
+                        VStack(spacing: 12) { ForEach(Riff.electric) { riffCard($0) } }
                     }
-                    Text("Pon el iPad cerca del amplificador (o de la boca de la acústica). Toca nota por nota: los acordes todavía no se reconocen.")
+                    section("Desenchufado") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Siempre con la acústica, en Mi estándar. Deja sonar las notas.")
+                                .font(.subheadline).foregroundStyle(stage.dim)
+                            ForEach(Riff.unplugged) { riffCard($0) }
+                        }
+                    }
+                    Text("Pon el iPad cerca del amplificador (o de la boca de la acústica). En los acordes, rasguea todas sus cuerdas a la vez.")
                         .font(.footnote).foregroundStyle(stage.dim)
                 }
                 .padding(32)
@@ -133,25 +140,29 @@ struct ConcertsView: View {
     }
 
     private func riffCard(_ r: Riff) -> some View {
-        Button {
+        let p = r.acoustic ? Genre.rockClasico.palette : stage
+        let detail = [r.difficulty.title, "\(Int(r.bpm)) ppm", r.notes.count > r.chords ? "\(r.notes.count - r.chords) notas" : nil,
+                      r.chords > 0 ? "\(r.chords) acordes" : nil, "récord \(store.best[r.key, default: 0])"]
+            .compactMap { $0 }.joined(separator: " · ")
+        return Button {
             concert = Concert(riff: r, guitar: guitar, speed: speed, player: player)
         } label: {
             HStack(spacing: 16) {
                 Image(systemName: "play.fill")
                     .font(.title2)
                     .frame(width: 56, height: 56)
-                    .background(stage.accent, in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(stage.text)
+                    .background(p.accent, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(p.text)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(r.title).font(stage.title(20)).foregroundStyle(stage.text)
-                    Text(r.mood).font(.subheadline).foregroundStyle(stage.dim)
-                    Text("\(r.difficulty.title) · \(Int(r.bpm)) ppm · \(r.notes.count) notas · récord \(store.best[r.key, default: 0])")
-                        .font(.caption.monospacedDigit()).foregroundStyle(stage.dim)
+                    Text(r.title).font(p.title(20)).foregroundStyle(p.text)
+                    Text(r.mood).font(.subheadline).foregroundStyle(p.dim)
+                    Text(detail)
+                        .font(.caption.monospacedDigit()).foregroundStyle(p.dim)
                 }
                 Spacer()
             }
             .padding(14)
-            .background(stage.panel, in: RoundedRectangle(cornerRadius: 14))
+            .background(p.panel, in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
         .disabled(listener.denied)
@@ -281,9 +292,12 @@ struct ConcertPlayView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var saved = false
 
+    /// Desenchufado usa colores madera; la eléctrica, los del metal.
+    private var p: Palette { concert.riff.acoustic ? Genre.rockClasico.palette : stage }
+
     var body: some View {
         ZStack {
-            stage.bg.ignoresSafeArea()
+            p.bg.ignoresSafeArea()
             VStack(spacing: 16) {
                 topBar
                 highway
@@ -295,11 +309,13 @@ struct ConcertPlayView: View {
         .onAppear {
             let c = concert
             listener.onNote = { [weak c] n in c?.heard(n) }
+            listener.onChroma = { [weak c] chroma in c?.heard(chroma) }
             listener.start()
             concert.start()
         }
         .onDisappear {
             listener.onNote = nil
+            listener.onChroma = nil
             listener.stop()
             concert.stop()
         }
@@ -315,20 +331,20 @@ struct ConcertPlayView: View {
                 Label("Salir", systemImage: "xmark")
                     .font(.headline)
                     .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(stage.panel, in: Capsule())
+                    .background(p.panel, in: Capsule())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(stage.text)
+            .foregroundStyle(p.text)
             Label("\(concert.guitar.name) · \(concert.guitar.tuningName)", systemImage: "guitars.fill")
                 .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(stage.panel, in: Capsule())
-                .foregroundStyle(stage.text)
-            Text("\(concert.riff.title) · \(concert.riff.difficulty.title.lowercased())").foregroundStyle(stage.dim)
+                .background(p.panel, in: Capsule())
+                .foregroundStyle(p.text)
+            Text("\(concert.riff.title) · \(concert.riff.difficulty.title.lowercased())").foregroundStyle(p.dim)
             Spacer()
             Text("Racha x\(concert.multiplier)").font(.headline).foregroundStyle(Color(hex: 0xF5A524))
             Text("\(concert.score)")
                 .font(.system(size: 30, weight: .black, design: .serif).monospacedDigit())
-                .foregroundStyle(stage.text)
+                .foregroundStyle(p.text)
                 .contentTransition(.numericText())
                 .animation(.snappy, value: concert.score)
         }
@@ -339,7 +355,7 @@ struct ConcertPlayView: View {
         TimelineView(.animation) { _ in
             Canvas { ctx, size in draw(ctx, size: size, now: CACurrentMediaTime()) }
         }
-        .background(stage.panel, in: RoundedRectangle(cornerRadius: 18))
+        .background(p.panel, in: RoundedRectangle(cornerRadius: 18))
         .overlay(alignment: .topLeading) {
             if let f = concert.feedback {
                 Text(f.text)
@@ -358,7 +374,7 @@ struct ConcertPlayView: View {
             if left > 0 {
                 Text("\(Int(ceil(left / concert.secondsPerBeat)))")
                     .font(.system(size: 140, weight: .black, design: .serif))
-                    .foregroundStyle(stage.text.opacity(0.85))
+                    .foregroundStyle(p.text.opacity(0.85))
             }
         }
     }
@@ -376,44 +392,56 @@ struct ConcertPlayView: View {
             var line = Path()
             line.move(to: CGPoint(x: 40, y: y(s)))
             line.addLine(to: CGPoint(x: size.width - 16, y: y(s)))
-            ctx.stroke(line, with: .color(stage.dim.opacity(0.6)), lineWidth: s >= 4 ? 2 : 1)
-            ctx.draw(Text(labels[s - 1]).font(.caption).foregroundStyle(stage.dim), at: CGPoint(x: 22, y: y(s)))
+            ctx.stroke(line, with: .color(p.dim.opacity(0.6)), lineWidth: s >= 4 ? 2 : 1)
+            ctx.draw(Text(labels[s - 1]).font(.caption).foregroundStyle(p.dim), at: CGPoint(x: 22, y: y(s)))
         }
 
         // Pulso del tiempo en la línea de golpe.
         let beatPhase = (now - concert.startTime) / concert.secondsPerBeat
         let pulse = beatPhase > -4 ? 1 - (beatPhase - floor(beatPhase)) : 0
         let bar = CGRect(x: hitX - 4, y: top - 22, width: 8, height: bottom - top + 44)
-        ctx.fill(Path(roundedRect: bar, cornerRadius: 4), with: .color(stage.accent.opacity(0.55 + 0.45 * pulse)))
+        ctx.fill(Path(roundedRect: bar, cornerRadius: 4), with: .color(p.accent.opacity(0.55 + 0.45 * pulse)))
 
         let r: CGFloat = 22
         for i in concert.riff.notes.indices {
             guard i < concert.times.count else { break }
             let dt = concert.times[i] - now
             let x = hitX + CGFloat(dt) * pxPerSecond
-            if x > size.width + r || x < -r { continue }
-            let n = concert.riff.notes[i]
+            if x > size.width + r || x < -r - 40 { continue }
+            let event = concert.riff.notes[i]
             let state = concert.states[i]
             let color: Color = switch state {
-            case .pending: stage.accent
+            case .pending: p.accent
             case .hit, .perfect: Palette.good
-            case .miss: stage.dim.opacity(0.4)
+            case .miss: p.dim.opacity(0.4)
             }
             let fade = x < hitX - 10 && state == .pending ? 0.6 : 1
-            let rect = CGRect(x: x - r, y: y(n.string) - r, width: r * 2, height: r * 2)
-            ctx.fill(Path(ellipseIn: rect), with: .color(color.opacity(fade)))
-            if state == .perfect { ctx.stroke(Path(ellipseIn: rect.insetBy(dx: -4, dy: -4)), with: .color(Palette.good), lineWidth: 2) }
-            ctx.draw(Text("\(n.fret)").font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(stage.text),
-                     at: CGPoint(x: x, y: y(n.string)))
+            let ys = event.frets.map { y($0.string) }
+            if event.isChord, let top = ys.min(), let low = ys.max() {
+                // Barra que une las notas del acorde y su nombre encima.
+                let bar = CGRect(x: x - r - 4, y: top - r - 4, width: (r + 4) * 2, height: low - top + (r + 4) * 2)
+                ctx.fill(Path(roundedRect: bar, cornerRadius: r + 4), with: .color(color.opacity(0.3 * fade)))
+                ctx.draw(Text(concert.chordName(i)).font(.system(size: 18, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color(hex: 0xF5A524)),
+                         at: CGPoint(x: x, y: top - r - 18 > 12 ? top - r - 18 : low + r + 18))
+            }
+            for f in event.frets {
+                let rect = CGRect(x: x - r, y: y(f.string) - r, width: r * 2, height: r * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(color.opacity(fade)))
+                if state == .perfect { ctx.stroke(Path(ellipseIn: rect.insetBy(dx: -4, dy: -4)), with: .color(Palette.good), lineWidth: 2) }
+                ctx.draw(Text("\(f.fret)").font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundStyle(concert.riff.acoustic ? p.bg : p.text),
+                         at: CGPoint(x: x, y: y(f.string)))
+            }
         }
     }
 
     private var bottomBar: some View {
         HStack {
-            Text("El iPad oye: ").foregroundStyle(stage.dim)
-                + Text(concert.lastHeard ?? "—").bold().foregroundStyle(stage.text)
+            Text("El iPad oye: ").foregroundStyle(p.dim)
+                + Text(concert.lastHeard ?? "—").bold().foregroundStyle(p.text)
             Spacer()
-            Text("\(concert.hits) de \(concert.riff.notes.count) notas").foregroundStyle(stage.dim).monospacedDigit()
+            Text("\(concert.hits) de \(concert.riff.notes.count) notas").foregroundStyle(p.dim).monospacedDigit()
             LevelMeter(level: listener.level).frame(width: 180)
         }
         .font(.headline)
@@ -423,7 +451,7 @@ struct ConcertPlayView: View {
         let record = store.best[concert.riff.key, default: 0]
         return VStack(spacing: 18) {
             Text(concert.accuracy >= 90 ? "¡Brutal!" : concert.accuracy >= 60 ? "Buen concierto" : "A seguir ensayando")
-                .font(stage.title(44)).foregroundStyle(stage.text)
+                .font(p.title(44)).foregroundStyle(p.text)
             HStack(spacing: 30) {
                 stat("Puntos", "\(concert.score)")
                 stat("Notas", "\(concert.hits)/\(concert.riff.notes.count)")
@@ -431,30 +459,30 @@ struct ConcertPlayView: View {
                 stat("Mejor racha", "\(concert.bestStreak)")
             }
             if concert.score > 0, concert.score >= record { Text("¡Nuevo récord de este riff!").foregroundStyle(Color(hex: 0xF5A524)) }
-            if concert.player == nil { Text("Sin jugador: no se guardó en ningún panel.").font(.footnote).foregroundStyle(stage.dim) }
+            if concert.player == nil { Text("Sin jugador: no se guardó en ningún panel.").font(.footnote).foregroundStyle(p.dim) }
             HStack(spacing: 14) {
                 Button("Otra vez") { saved = false; concert.start() }
                     .font(.title3.bold())
                     .padding(.horizontal, 26).padding(.vertical, 14)
-                    .background(stage.accent, in: Capsule())
-                    .foregroundStyle(stage.text)
+                    .background(p.accent, in: Capsule())
+                    .foregroundStyle(p.text)
                 Button("Salir") { dismiss() }
                     .font(.title3.bold())
                     .padding(.horizontal, 26).padding(.vertical, 14)
-                    .background(stage.panel, in: Capsule())
-                    .foregroundStyle(stage.text)
+                    .background(p.panel, in: Capsule())
+                    .foregroundStyle(p.text)
             }
             .buttonStyle(.plain)
         }
         .padding(36)
-        .background(stage.bg.opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(stage.accent, lineWidth: 2))
+        .background(p.bg.opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(p.accent, lineWidth: 2))
     }
 
     private func stat(_ title: String, _ value: String) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(.system(size: 34, weight: .black, design: .serif).monospacedDigit()).foregroundStyle(stage.text)
-            Text(title).font(.caption).foregroundStyle(stage.dim)
+            Text(value).font(.system(size: 34, weight: .black, design: .serif).monospacedDigit()).foregroundStyle(p.text)
+            Text(title).font(.caption).foregroundStyle(p.dim)
         }
     }
 }

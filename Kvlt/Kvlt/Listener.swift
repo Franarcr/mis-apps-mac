@@ -9,6 +9,13 @@ struct HeardNote {
     let midi: Int
 }
 
+/// Lo que sonó justo después de un golpe, repartido en las 12 notas (Do … Si).
+/// Sirve para comprobar acordes: el juego sabe qué acorde espera y mira si suenan sus notas.
+struct HeardChroma {
+    let time: Double
+    let chroma: [Float]
+}
+
 /// Escucha el micrófono: nivel, frecuencia actual (para el afinador) y notas nuevas (para el juego).
 @MainActor
 final class Listener: ObservableObject {
@@ -19,6 +26,8 @@ final class Listener: ObservableObject {
 
     /// Lo llama el juego cada vez que empieza una nota nueva.
     var onNote: ((HeardNote) -> Void)?
+    /// Lo llama el juego después de cada golpe, para los acordes.
+    var onChroma: ((HeardChroma) -> Void)?
 
     private let engine = AVAudioEngine()
     private var processor: PitchProcessor?
@@ -78,6 +87,7 @@ final class Listener: ObservableObject {
         level = u.level
         frequency = u.frequency
         for n in u.notes { onNote?(n) }
+        for c in u.chromas { onChroma?(c) }
     }
 }
 
@@ -88,6 +98,7 @@ final class PitchProcessor: @unchecked Sendable {
         var level: Float
         var frequency: Double?
         var notes: [HeardNote]
+        var chromas: [HeardChroma]
     }
 
     private let sampleRate: Double
@@ -111,6 +122,21 @@ final class PitchProcessor: @unchecked Sendable {
     private var candidateCount = 0
     private var stableMidi: Int?
 
+    // Acordes: ventana larga (170 ms) para distinguir bien las notas graves.
+    private let chromaSize = 8192
+    private var history: [Float] = []
+    private var chromaPending: Double?
+    private lazy var dft = vDSP.DFT(count: chromaSize, direction: .forward, transformType: .complexComplex, ofType: Float.self)
+    private lazy var hann = vDSP.window(ofType: Float.self, usingSequence: .hanningDenormalized, count: chromaSize, isHalfWindow: false)
+    /// A qué nota (0 = Do … 11 = Si) pertenece cada franja del espectro; -1 si cae entre dos notas.
+    private lazy var binClass: [Int] = (0..<chromaSize / 2).map { b in
+        let f = Double(b) * sampleRate / Double(chromaSize)
+        guard f >= 70, f <= 1600 else { return -1 }
+        let m = 69 + 12 * log2(f / 440)
+        let r = m.rounded()
+        return abs(m - r) <= 0.35 ? (Int(r) % 12 + 12) % 12 : -1
+    }
+
     init(sampleRate: Double, latency: Double, send: @escaping (Update) -> Void) {
         self.sampleRate = sampleRate
         self.latency = latency
@@ -126,17 +152,21 @@ final class PitchProcessor: @unchecked Sendable {
         let count = Int(buffer.frameLength)
         let arrival = CACurrentMediaTime()
         samples.append(contentsOf: UnsafeBufferPointer(start: ch, count: count))
+        history.append(contentsOf: UnsafeBufferPointer(start: ch, count: count))
+        if history.count > chromaSize * 2 { history.removeFirst(history.count - chromaSize * 2) }
 
-        var update = Update(level: 0, frequency: nil, notes: [])
+        var update = Update(level: 0, frequency: nil, notes: [], chromas: [])
         var analyzed = false
         while samples.count >= window {
             // Momento (aproximado) en que sonó el centro de esta ventana.
             let samplesAfter = samples.count - window
             let time = arrival - latency - Double(samplesAfter + window / 2) / sampleRate
-            let frame = samples.withUnsafeBufferPointer { analyze($0.baseAddress!, time: time) }
+            let historyEnd = history.count - samplesAfter
+            let frame = samples.withUnsafeBufferPointer { analyze($0.baseAddress!, time: time, historyEnd: historyEnd) }
             update.level = frame.level
             update.frequency = frame.frequency
             if let n = frame.note { update.notes.append(n) }
+            if let c = frame.chroma { update.chromas.append(c) }
             samples.removeFirst(hop)
             analyzed = true
         }
@@ -147,9 +177,10 @@ final class PitchProcessor: @unchecked Sendable {
         var level: Float
         var frequency: Double?
         var note: HeardNote?
+        var chroma: HeardChroma?
     }
 
-    private func analyze(_ x: UnsafePointer<Float>, time: Double) -> Frame {
+    private func analyze(_ x: UnsafePointer<Float>, time: Double, historyEnd: Int) -> Frame {
         var rms: Float = 0
         vDSP_rmsqv(x, 1, &rms, vDSP_Length(window))
         var frame = Frame(level: rms)
@@ -157,6 +188,13 @@ final class PitchProcessor: @unchecked Sendable {
         // Golpe: el volumen sube de golpe después de una caída o desde el silencio.
         if rms > gate, rms > lastLevel * 1.5, time - lastOnset > 0.07 {
             startNote(at: time)
+        }
+        // Un poco después del golpe se mira qué notas suenan (para los acordes).
+        if let start = chromaPending, time >= start + 0.16 {
+            chromaPending = nil
+            if rms > gate, historyEnd >= chromaSize {
+                frame.chroma = HeardChroma(time: start, chroma: chroma(end: historyEnd))
+            }
         }
         lastLevel = rms
         if rms < gate {
@@ -192,6 +230,18 @@ final class PitchProcessor: @unchecked Sendable {
         onsetTime = time
         onsetSent = false
         lastOnset = time
+        chromaPending = time
+    }
+
+    private func chroma(end: Int) -> [Float] {
+        var x = Array(history[(end - chromaSize)..<end])
+        vDSP.multiply(x, hann, result: &x)
+        let (re, im) = dft!.transform(inputReal: x, inputImaginary: [Float](repeating: 0, count: chromaSize))
+        var c = [Float](repeating: 0, count: 12)
+        for b in 1..<chromaSize / 2 where binClass[b] >= 0 {
+            c[binClass[b]] += (re[b] * re[b] + im[b] * im[b]).squareRoot()
+        }
+        return c
     }
 
     /// Método YIN (de Cheveigné y Kawahara, 2002) para hallar la frecuencia fundamental.
