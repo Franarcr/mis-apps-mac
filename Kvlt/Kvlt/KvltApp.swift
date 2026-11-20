@@ -37,6 +37,7 @@ struct HomeView: View {
     @State private var showBoard = false
     @State private var showPlayers = false
     @State private var customFor: Genre?
+    @State private var showConcerts = false
 
     private var selected: Genre? { Genre(rawValue: selectedRaw) }
     private var p: Palette { selected?.palette ?? .mix }
@@ -47,6 +48,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
                     header
+                    concertsCard
                     genreStrip
                     genreSection
                     playersSection
@@ -81,6 +83,30 @@ struct HomeView: View {
         .sheet(isPresented: $showBoard) { LeaderboardView().environmentObject(store) }
         .sheet(isPresented: $showPlayers) { PlayersView().environmentObject(store) }
         .sheet(item: $customFor) { genre in CustomQuestionsView(genre: genre).environmentObject(store) }
+        .fullScreenCover(isPresented: $showConcerts) { ConcertsView().environmentObject(store) }
+    }
+
+    private var concertsCard: some View {
+        let m = Genre.metal.palette
+        return Button { showConcerts = true } label: {
+            HStack(spacing: 18) {
+                Image(systemName: "guitars.fill")
+                    .font(.system(size: 30))
+                    .frame(width: 64, height: 64)
+                    .background(m.accent, in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(m.text)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Conciertos").font(m.title(26)).foregroundStyle(m.text)
+                    Text("Toca riffs con tu guitarra de verdad: el iPad te escucha").foregroundStyle(m.dim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(m.dim)
+            }
+            .padding(18)
+            .background(m.panel, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(m.accent.opacity(0.5)))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Partes

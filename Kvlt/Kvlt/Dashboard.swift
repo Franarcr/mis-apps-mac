@@ -144,7 +144,7 @@ struct DashboardView: View {
     }
 
     private func detail(_ r: GameRecord) -> String {
-        var parts = [r.date.formatted(date: .abbreviated, time: .shortened), "\(r.correct)/\(r.total) correctas"]
+        var parts = [r.date.formatted(date: .abbreviated, time: .shortened), "\(r.correct)/\(r.total) " + (r.label.hasPrefix("Concierto") ? "notas" : "correctas")]
         if !r.rivals.isEmpty { parts.append("vs. " + r.rivals.joined(separator: ", ")) }
         return parts.joined(separator: " · ")
     }

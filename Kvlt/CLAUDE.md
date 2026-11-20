@@ -11,6 +11,16 @@ misma carpeta y bundle `com.francho.kvlt`, nombre visible «Rockola». Lee `../C
 - Modos: solo, por turnos y duelo cara a cara; panel por jugador y tabla de posiciones (`Dashboard.swift`).
 - Motor en `Engine.swift`, juego en `Play.swift`, estilo en `Theme.swift`.
 
+## Conciertos (juego de ritmo con su guitarra)
+
+- Tarjeta «Conciertos» en el inicio. Eliges jugador (o «Sin guardar»), guitarra, velocidad y riff; hay afinador.
+- `Listener.swift`: micrófono con AVAudioEngine (modo `measurement`) y detección con YIN. Una nota empieza cuando
+  sube el volumen de golpe o cambia la altura; solo se acepta una ventana que empiece después del golpe.
+- `Concerts.swift`: guitarras (la Dean, −1 semitono), 3 riffs originales, partida y `Store.saveConcert`.
+  Acierto = nota exacta u octava, dentro del margen de la dificultad (0,25 / 0,2 / 0,16 s).
+- `ConcertViews.swift`: menú, afinador y pantalla de juego (Canvas con las 6 cuerdas).
+- Solo notas sueltas; los acordes quedan pendientes.
+
 ## Instalar
 
 `./instalar-ipad.sh`: aparta perfiles viejos, compila para el UDID del iPad, instala y abre (reintenta si está
@@ -18,8 +28,7 @@ bloqueado). La firma caduca a los 7 días.
 
 ## Ideas aprobadas pero sin empezar
 
-1. **Conciertos:** juego de ritmo donde el iPad escucha su guitarra real.
-2. **Demo Tape:** carrera de una banda inventada.
+1. **Demo Tape:** carrera de una banda inventada.
 
 Sus guitarras: Yamaha tipo Strat HSS, Gretsch con dos humbuckers y Dean tipo Explorer con dos humbuckers, más una
 acústica. Todas en Mi estándar menos la Dean, en Mi♭ estándar (medio tono abajo). Usar solo riffs originales, nunca
