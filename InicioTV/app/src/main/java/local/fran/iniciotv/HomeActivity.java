@@ -1,6 +1,8 @@
 package local.fran.iniciotv;
 
 import android.app.Activity;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -34,7 +36,9 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -45,37 +49,35 @@ import java.util.Set;
  */
 public class HomeActivity extends Activity {
 
-    /** Primera fila, en este orden (las que estén instaladas). */
-    private static final List<String> FAVORITES = Arrays.asList(
-            "com.netflix.ninja",                        // Netflix
-            "com.google.android.youtube.tv",            // YouTube
-            "com.disney.disneyplus",                    // Disney+
-            "com.wbd.stream", "com.hbo.hbomax",         // Max
-            "com.amazon.amazonvideo.livingroom",        // Prime Video
-            "com.apple.atve.androidtv.appletv");        // Apple TV
+    /**
+     * La pantalla, fila por fila y en 5 columnas, tal como la dibujó Fran. Cada casilla es un acceso del TV
+     * (TV, CABLE, APPLE, INPUTS, SETTINGS, POWER), una app por su paquete (o varios posibles, separados por «|»,
+     * o «nombre:» para buscarla por su nombre), o null para dejarla vacía.
+     * Las apps que no están aquí no se muestran.
+     */
+    private static final String[][] LAYOUT = {
+            {null, "TV", "CABLE", "APPLE", null},
+            {"com.netflix.ninja",                       // Netflix
+             "com.google.android.youtube.tv",           // YouTube
+             "com.apple.atve.androidtv.appletv",        // Apple TV (la app)
+             "com.cbs.ott|nombre:Paramount",            // Paramount+
+             "com.crunchyroll.crunchyroid|nombre:Crunchyroll"},
+            {"com.tubitv|nombre:Tubi",
+             "com.google.android.youtube.tvmusic|nombre:YouTube Music",
+             "com.amazon.amazonvideo.livingroom",       // Prime Video
+             "com.disney.disneyplus",                   // Disney+
+             "com.wbd.stream|com.hbo.hbomax"},          // HBO Max
+            {null, "INPUTS", "SETTINGS", "POWER", null},
+    };
 
-    /** Apps que no se muestran: las de Google que no se usan y las del sistema que van en la fila de TV. */
-    private static final Set<String> HIDDEN = new HashSet<>(Arrays.asList(
-            "com.android.vending",                      // Google Play Store
-            "com.google.android.play.games",            // Google Play Juegos
-            "com.google.android.videos",                // Google TV (películas)
-            "com.mediatek.wwtv.tvcenter",               // TV en vivo (va en la fila de TV)
-            "com.android.tv.settings",                  // Configuración (va en la fila de TV)
-            "com.mediatek.androidbox",
-            "com.mediatek.wwtv.mediaplayer",            // MMP
-            "org.videolan.vlc",                         // VLC
-            "com.univision.prendetv",                   // ViX
-            "com.FDGEntertainment.redball4.gp",         // Red Ball 4
-            "com.radio.fmradio",                        // Radio FM
-            "com.mubi",                                 // MUBI
-            "com.iqiyi.i18n.tv",                        // iQIYI
-            "com.tcl.browser",                          // BrowseHere
-            "com.Tv.Receiver.phonetotv.casting.screenmirroring.Recievertv", // Screen mirroring
-            "tv.maxplayer.android"));
+    /** Al volver al inicio, la selección empieza en esta casilla (fila, columna): «TV en vivo». */
+    private static final int FOCUS_ROW = 0, FOCUS_COL = 1;
 
     // Entradas del TV (ver `adb shell dumpsys tv_input`): sintonizador de antena y HDMI 2, donde entra el cable.
     private static final String ANTENNA = "com.mediatek.tvinput/.tuner.TunerInputService/HW0";
     private static final String CABLE = "com.mediatek.tvinput/.hdmi.HDMIInputService/HW5";
+    /** HDMI 1, donde está la cajita Apple TV (se usa si el TV no la reconoce por su nombre). */
+    private static final String APPLE_TV_INPUT = "com.mediatek.tvinput/.hdmi.HDMIInputService/HW4";
 
     private LinearLayout rows;
     /** Fondo de pantalla completa: la imagen de la app seleccionada, muy difuminada (como en Apple TV). */
@@ -119,12 +121,11 @@ public class HomeActivity extends Activity {
         clp.setMargins(0, dp(24), dp(56), 0);
         root.addView(clock, clp);
 
-        // Las tres filas, abajo.
+        // Las filas, centradas en la pantalla.
         rows = new LinearLayout(this);
         rows.setOrientation(LinearLayout.VERTICAL);
         rows.setClipChildren(false);
-        FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        rlp.bottomMargin = dp(80);
+        FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL);
         root.addView(rows, rlp);
 
         setContentView(root);
@@ -171,52 +172,111 @@ public class HomeActivity extends Activity {
     private void loadApps() {
         PackageManager pm = getPackageManager();
         Intent q = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
-        List<App> favorites = new ArrayList<>(), others = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
+        Map<String, App> installed = new HashMap<>();
         for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
             ActivityInfo ai = ri.activityInfo;
-            if (!seen.add(ai.packageName) || ai.packageName.equals(getPackageName()) || HIDDEN.contains(ai.packageName)) continue;
+            if (installed.containsKey(ai.packageName)) continue;
             App a = new App();
             a.pkg = ai.packageName;
             a.name = String.valueOf(ri.loadLabel(pm));
             a.banner = ai.loadBanner(pm);
             if (a.banner == null) a.banner = ai.applicationInfo.loadBanner(pm);
-            if (a.banner == null) a.icon = ri.loadIcon(pm);
+            a.icon = ri.loadIcon(pm);
             a.launch = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
                     .setClassName(ai.packageName, ai.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            (FAVORITES.contains(a.pkg) ? favorites : others).add(a);
+            installed.put(a.pkg, a);
         }
-        favorites.sort((x, y) -> Integer.compare(FAVORITES.indexOf(x.pkg), FAVORITES.indexOf(y.pkg)));
-        others.sort((x, y) -> x.name.toLowerCase(Locale.ROOT).compareTo(y.name.toLowerCase(Locale.ROOT)));
 
         rows.removeAllViews();
-        // Cuadrícula fija de 5 columnas: las apps y, al final, los accesos del TV con el mismo formato.
-        List<View> cells = new ArrayList<>();
-        List<App> all = new ArrayList<>(favorites);
-        all.addAll(others);
-        for (App a : all) cells.add(tile(a.name, a.banner, a.icon, a.launch));
-        cells.add(tile("TV en vivo", null, getDrawable(R.drawable.ic_tv), input(ANTENNA)));   // antena
-        cells.add(tile("Cable", null, getDrawable(R.drawable.ic_cable), input(CABLE)));       // HDMI 2
-        Intent inputs = new Intent("com.android.tv.action.VIEW_INPUTS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (inputs.resolveActivity(pm) != null) cells.add(tile("Entradas", null, getDrawable(R.drawable.ic_input), inputs));
-        Intent settings = new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        cells.add(tile("Configuración", null, getDrawable(R.drawable.ic_gear), settings));
-        LinearLayout row = null;
-        for (int i = 0; i < cells.size(); i++) {
-            if (i % COLUMNS == 0) row = newRow(dp(4));
-            row.addView(cells.get(i));
+        for (String[] line : LAYOUT) {
+            LinearLayout row = newRow(dp(4));
+            for (String slot : line) {
+                View cell = slot == null ? null : cell(slot, installed, pm);
+                row.addView(cell != null ? cell : empty());
+            }
         }
         focusFirst();
     }
 
-    private static final int COLUMNS = 5;
+    /** Arma la casilla de un acceso del TV o de una app; null si esa app no está instalada. */
+    private View cell(String slot, Map<String, App> installed, PackageManager pm) {
+        switch (slot) {
+            case "TV": return tile("TV en vivo", null, getDrawable(R.drawable.ic_tv), input(ANTENNA));
+            case "CABLE": return tile("Cable", null, getDrawable(R.drawable.ic_cable), input(CABLE));
+            case "APPLE": {
+                return tile("Apple TV", null, getDrawable(R.drawable.ic_apple), input(appleTvInput()));
+            }
+            case "INPUTS": {
+                Intent inputs = new Intent("com.android.tv.action.VIEW_INPUTS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                return inputs.resolveActivity(pm) != null ? tile("Entradas", null, getDrawable(R.drawable.ic_input), inputs) : null;
+            }
+            case "SETTINGS":
+                return tile("Configuración", null, getDrawable(R.drawable.ic_gear),
+                        new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            case "POWER": {
+                View c = tile("Apagar TV", null, getDrawable(R.drawable.ic_power), null);
+                ((ViewGroup) c).getChildAt(0).setOnClickListener(v -> powerOff());
+                return c;
+            }
+        }
+        for (String option : slot.split("\\|")) {
+            App a = null;
+            if (option.startsWith("nombre:")) {
+                String wanted = option.substring(7).toLowerCase(Locale.ROOT);
+                for (App x : installed.values()) if (x.name.toLowerCase(Locale.ROOT).contains(wanted)) { a = x; break; }
+            } else {
+                a = installed.get(option);
+            }
+            if (a != null) return tile(a.name, a.banner, a.banner == null ? a.icon : null, a.launch);
+        }
+        return null;
+    }
+
+    /** Casilla vacía del mismo tamaño, para que las columnas queden alineadas. */
+    private View empty() {
+        View v = new View(this);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(150), dp(106));
+        lp.setMargins(dp(10), 0, dp(10), 0);
+        v.setLayoutParams(lp);
+        return v;
+    }
+
+    /** La entrada de la cajita Apple TV: la que el TV reconoce con ese nombre (HDMI-CEC) o, si no, la fija. */
+    private String appleTvInput() {
+        try {
+            android.media.tv.TvInputManager tim = (android.media.tv.TvInputManager) getSystemService(TV_INPUT_SERVICE);
+            for (android.media.tv.TvInputInfo info : tim.getTvInputList()) {
+                CharSequence label = info.loadLabel(this);
+                CharSequence custom = info.loadCustomLabel(this);
+                String text = (label + " " + custom).toLowerCase(Locale.ROOT);
+                if (text.contains("apple")) return info.getParentId() != null ? info.getParentId() : info.getId();
+            }
+        } catch (Exception ignored) { }
+        return APPLE_TV_INPUT;
+    }
+
+    /** Apaga el TV (lo deja en reposo, como el botón del control). */
+    private void powerOff() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        ComponentName admin = new ComponentName(this, PowerAdmin.class);
+        if (dpm.isAdminActive(admin)) {
+            dpm.lockNow();
+        } else {
+            // Aún no tiene permiso: lo pide una vez en la pantalla del TV.
+            Intent ask = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                    .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                    .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Para que el botón «Apagar TV» pueda apagar el televisor.");
+            try { startActivity(ask); } catch (Exception ignored) { }
+        }
+    }
 
     private LinearLayout newRow(int top) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setClipChildren(false);
         row.setClipToPadding(false);
-        row.setPadding(dp(56), top, dp(56), 0);
+        row.setGravity(Gravity.CENTER_HORIZONTAL);
+        row.setPadding(0, top, 0, 0);
         rows.addView(row);
         return row;
     }
@@ -227,14 +287,14 @@ public class HomeActivity extends Activity {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     }
 
-    /** Al volver al inicio, la selección empieza en la primera app. */
+    /** Al volver al inicio, la selección empieza en «TV en vivo». */
     private void focusFirst() {
         rows.post(() -> {
-            if (rows.getChildCount() == 0) return;
-            ViewGroup first = (ViewGroup) rows.getChildAt(0);
-            if (first.getChildCount() == 0) return;
-            View cell = first.getChildAt(0);
-            (cell instanceof ViewGroup && ((ViewGroup) cell).getChildCount() > 0 && !cell.isFocusable() ? ((ViewGroup) cell).getChildAt(0) : cell).requestFocus();
+            if (rows.getChildCount() <= FOCUS_ROW) return;
+            ViewGroup row = (ViewGroup) rows.getChildAt(FOCUS_ROW);
+            if (row.getChildCount() <= FOCUS_COL) return;
+            View cell = row.getChildAt(FOCUS_COL);
+            if (cell instanceof ViewGroup && ((ViewGroup) cell).getChildCount() > 0) ((ViewGroup) cell).getChildAt(0).requestFocus();
         });
     }
 
@@ -299,7 +359,7 @@ public class HomeActivity extends Activity {
         cell.addView(t, new LinearLayout.LayoutParams(dp(150), dp(84)));
         cell.addView(name_, new LinearLayout.LayoutParams(dp(150), dp(22)));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, dp(20), 0);
+        lp.setMargins(dp(10), 0, dp(10), 0);
         cell.setLayoutParams(lp);
         return cell;
     }
